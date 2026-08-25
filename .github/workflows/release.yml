@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   build-verify:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     # macos-26 is the current Swift 6-capable Apple Silicon runner.
     # https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md
     runs-on: macos-26
