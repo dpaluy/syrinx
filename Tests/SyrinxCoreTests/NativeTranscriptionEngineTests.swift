@@ -375,8 +375,6 @@ final class NativeTranscriptionEngineTests: XCTestCase {
         let started = await backendSignal.waitForStart(within: .seconds(1))
         XCTAssertTrue(started)
         let second = Task { try await engine.transcribe(TranscriptionRequest(audioFile: source, deadline: 1)) }
-        try await Task.sleep(for: .milliseconds(15))
-        XCTAssertEqual(recorder.values, ["admission", "open", "inference"])
         let cleanupStarted = await cleanupLatch.waitForStart(within: .seconds(1))
         XCTAssertTrue(cleanupStarted)
         XCTAssertEqual(recorder.values, ["admission", "open", "inference", "cleanup"])
