@@ -1,0 +1,381 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-v0.1-baseline",
+  "modelId": "parakeet-tdt-0.6b-v3",
+  "variantId": "int8",
+  "repository": "FluidInference/parakeet-tdt-0.6b-v3-coreml",
+  "immutableCommit": "aed02740059203c4a87495924f685de3722ae9ce",
+  "repositoryCommitUrl": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/tree/aed02740059203c4a87495924f685de3722ae9ce",
+  "fluidAudioCompatibility": {
+    "version": "0.15.5",
+    "commit": "19600a485baa4998812e4654b70d2bab8f2c9949",
+    "commitUrl": "https://github.com/FluidInference/FluidAudio/commit/19600a485baa4998812e4654b70d2bab8f2c9949",
+    "swiftToolsVersion": "6.0",
+    "platform": "macOS 14+",
+    "architecture": "Apple Silicon arm64",
+    "asrVersion": "v3",
+    "encoderPrecision": "int8",
+    "requiredArtifacts": [
+      "Preprocessor.mlmodelc",
+      "Encoder.mlmodelc",
+      "Decoder.mlmodelc",
+      "JointDecisionv3.mlmodelc",
+      "parakeet_vocab.json"
+    ],
+    "sourceAuthority": "AsrModels and ModelNames source at the pinned FluidAudio commit"
+  },
+  "license": {
+    "spdx": "CC-BY-4.0",
+    "declaredBy": "Hugging Face model-card front matter at the immutable model commit",
+    "modelCardUrl": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/blob/aed02740059203c4a87495924f685de3722ae9ce/README.md",
+    "modelCardTextLicense": "Apache-2.0",
+    "apiLicenseField": null,
+    "reviewStatus": "release review required because the model-card front matter says CC BY 4.0, the rendered license section says Apache 2.0, and the Hugging Face API top-level license field is null"
+  },
+  "attribution": {
+    "publisher": "FluidInference",
+    "model": "parakeet-tdt-0.6b-v3 Core ML",
+    "baseModel": "nvidia/parakeet-tdt-0.6b-v3",
+    "datasets": [
+      "nvidia/Granary",
+      "nemo/asr-set-3.0"
+    ],
+    "notice": "Parakeet TDT v3, 0.6B multilingual speech-to-text Core ML model, published by FluidInference. Apply CC BY 4.0 attribution and license terms before redistribution.",
+    "sourceUrl": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/tree/aed02740059203c4a87495924f685de3722ae9ce"
+  },
+  "staging": {
+    "modelsRoot": "<models-root>",
+    "repositoryFolder": "parakeet-tdt-0.6b-v3",
+    "loadArgument": "<models-root>/parakeet-tdt-0.6b-v3",
+    "layout": "<models-root>/parakeet-tdt-0.6b-v3/{Preprocessor.mlmodelc,Encoder.mlmodelc,Decoder.mlmodelc,JointDecisionv3.mlmodelc,parakeet_vocab.json}",
+    "callerMustPassRepositoryFolder": true,
+    "symlinksAllowed": false,
+    "extraFilesAllowed": false,
+    "pathRule": "All manifest paths are relative to the repository folder, use forward slashes, contain no dot segments, and must match one of the five required artifact prefixes or the vocabulary file.",
+    "sourceEvidence": {
+      "asrModelsLoad": "https://github.com/FluidInference/FluidAudio/blob/19600a485baa4998812e4654b70d2bab8f2c9949/Sources/FluidAudio/ASR/Parakeet/SlidingWindow/TDT/AsrModels.swift#L241-L255",
+      "repoFolder": "https://github.com/FluidInference/FluidAudio/blob/19600a485baa4998812e4654b70d2bab8f2c9949/Sources/FluidAudio/ModelNames.swift#L207-L258",
+      "v3Int8RequiredModels": "https://github.com/FluidInference/FluidAudio/blob/19600a485baa4998812e4654b70d2bab8f2c9949/Sources/FluidAudio/ModelNames.swift#L328-L359"
+    }
+  },
+  "files": [
+    {
+      "relativePath": "Decoder.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "4238c4e81ecd0dc94bd7dfbb60f7e2cc824107c1ffe0387b8607b72833dba350",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/analytics/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "edd7f2bab7cba54194e30024ddc915e87267a566",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "4238c4e81ecd0dc94bd7dfbb60f7e2cc824107c1ffe0387b8607b72833dba350",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Decoder.mlmodelc/coremldata.bin",
+      "size": 554,
+      "sha256": "18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "4197eba04300de1a1f967a64bd98fcd93fa2de76",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Decoder.mlmodelc/metadata.json",
+      "size": 3427,
+      "sha256": "a39e93cd8371b8ded92635c7804fcd0590f0d1dd9415c6d19a0484be073077d9",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/metadata.json",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "781350d40ed83511afc3bc31a804e6a543e69d04",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "Decoder.mlmodelc/model.mil",
+      "size": 13110,
+      "sha256": "ef2a0a281695398a62fde86ac269c68f73d5b578d7ed3b31f2ba91a2d1ea1f35",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/model.mil",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "95328ba81ca8dceb16c039e62f1a7d447ede43c2",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "Decoder.mlmodelc/weights/weight.bin",
+      "size": 23604992,
+      "sha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Decoder.mlmodelc/weights/weight.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "082a9f641c6a61223b00416c504d89e8b3b26463",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Encoder.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "42e638870d73f26b332918a3496ce36793fbb413a81cbd3d16ba01328637a105",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/analytics/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "4738782a8e36389621ff4b3b90dd2a661b35146c",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "42e638870d73f26b332918a3496ce36793fbb413a81cbd3d16ba01328637a105",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Encoder.mlmodelc/coremldata.bin",
+      "size": 485,
+      "sha256": "d48034a167a82e88fc3df64f60af963ab3983538271175b8319e7d5720a0fb86",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "24ee1e963b8b12f67f1260922002a88409380cf4",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "d48034a167a82e88fc3df64f60af963ab3983538271175b8319e7d5720a0fb86",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Encoder.mlmodelc/metadata.json",
+      "size": 2921,
+      "sha256": "da24da9cca943fb29d7fa8e376d57fca7cb3aa08ca51b956b0b0e56813f087e9",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/metadata.json",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "aecde9a8c4ff70c5b5d227a079650fcf5033caee",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "Encoder.mlmodelc/model.mil",
+      "size": 959769,
+      "sha256": "ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/model.mil",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "93d1301ccde7c2ca447af6c01ab05bfda5a5dd2c",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "Encoder.mlmodelc/weights/weight.bin",
+      "size": 445187200,
+      "sha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Encoder.mlmodelc/weights/weight.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "75b57b7eeff4ffbb408bc4760674dabf1eee5ea3",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "JointDecisionv3.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "26def4bf73dd56d29dee21c8ef97cb8969e62f6120ed1adc91e46828e2737b6c",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/analytics/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "d7a1bac08799aa773df5ec191ad8fc393e507a35",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "26def4bf73dd56d29dee21c8ef97cb8969e62f6120ed1adc91e46828e2737b6c",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "JointDecisionv3.mlmodelc/coremldata.bin",
+      "size": 521,
+      "sha256": "f5fc08b741400f0088492c9e839418b1e18522f19cba28d361dd030c5f398342",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "61f5e3200acbf214334d3855e6a97016d315aba7",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "f5fc08b741400f0088492c9e839418b1e18522f19cba28d361dd030c5f398342",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "JointDecisionv3.mlmodelc/metadata.json",
+      "size": 3453,
+      "sha256": "d9307211b9a37e0f0ac260c7660b1571a3de25841035cfdf9b58fd40425f890f",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/metadata.json",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "0461ef9e55ba8e8ba0d2cb33b6e1a031b0d481d7",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "JointDecisionv3.mlmodelc/model.mil",
+      "size": 11775,
+      "sha256": "be60732943389a047175111a83f8839f3eb39d4803adafa828a0871b2f39818d",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/model.mil",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "0a80fde4b1ec61093a03fc0fc3431172db34a4d2",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "JointDecisionv3.mlmodelc/weights/weight.bin",
+      "size": 12642764,
+      "sha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/JointDecisionv3.mlmodelc/weights/weight.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "c1a3fa5de42a5ba65d48961f246a54760e859785",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Preprocessor.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "sha256": "c9beeb989c8d66f8be11df59bc6df277ec76cee404f6865b46243835ef562f6d",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/analytics/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "cadf776b6eddc28eae76654cdff21b7c61efbd78",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "c9beeb989c8d66f8be11df59bc6df277ec76cee404f6865b46243835ef562f6d",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Preprocessor.mlmodelc/coremldata.bin",
+      "size": 486,
+      "sha256": "dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/coremldata.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "c86b363f1bbf6a4f38ec5757390b7ac17e99adda",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "Preprocessor.mlmodelc/metadata.json",
+      "size": 2841,
+      "sha256": "2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/metadata.json",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "06162c58cf2f5343a0e60f36f843bcdf3cc58527",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "Preprocessor.mlmodelc/model.mil",
+      "size": 28181,
+      "sha256": "4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/model.mil",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "f987e2479228436c49189aa47edb376db74dcff5",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    },
+    {
+      "relativePath": "Preprocessor.mlmodelc/weights/weight.bin",
+      "size": 491072,
+      "sha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/Preprocessor.mlmodelc/weights/weight.bin",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "47be051f50981bc166d0bcf6111cff47dd0db117",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+        "lfsObjectMatchesLocalSha256": true
+      }
+    },
+    {
+      "relativePath": "parakeet_vocab.json",
+      "size": 151122,
+      "sha256": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+      "url": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml/resolve/aed02740059203c4a87495924f685de3722ae9ce/parakeet_vocab.json",
+      "hashVerification": {
+        "status": "locallyVerified",
+        "method": "Downloaded once and hashed locally with SHA-256; local byte size matched the Hugging Face tree API.",
+        "repositoryOid": "c684822ec3b671ebc449c433a7012398d39b8bb0",
+        "repositoryOidAlgorithm": "git-sha1",
+        "lfsObjectSha256": null,
+        "lfsObjectMatchesLocalSha256": null
+      }
+    }
+  ],
+  "totalSize": 483105645,
+  "hashVerificationSummary": {
+    "fileCount": 21,
+    "locallyVerifiedCount": 21,
+    "metadataOnlyCount": 0,
+    "lfsObjectMatchCount": 12,
+    "downloadedOnce": true,
+    "sizeMatchesForAllFiles": true,
+    "releaseGate": "open"
+  },
+  "manifestContentDigest": {
+    "algorithm": "SHA-256",
+    "hex": "3967d537c8ed54cc46586cdaa7eec5d61c9cb9ea7bf4d16039ffb773102326d9",
+    "procedure": "Serialize this JSON as UTF-8 with LF line endings, recursively sort object keys, preserve array order, remove the manifestContentDigest property, emit compact JSON with no trailing newline, then hash the bytes with SHA-256.",
+    "selfExclusion": "The manifestContentDigest property is excluded before hashing to avoid a self-reference."
+  },
+  "releaseGate": {
+    "status": "open",
+    "reasons": [
+      "This commit is a proposed v0.1 baseline, not an approved release revision.",
+      "T02 verifies the file tree and hashes but does not prove a successful Core ML load and transcription through FluidAudio.",
+      "The model card declares CC BY 4.0, but the Hugging Face API top-level license field is null and requires release review."
+    ]
+  }
+}
