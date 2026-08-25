@@ -11,15 +11,16 @@ The installer package contains the immutable versioned payload under:
   versions/<version>/<executable>
 ```
 
-The package does not create a system `current` pointer. T50C owns the
-per-user materialized runtime contract, relative to its data root:
+The package does not create a system `current` pointer. The service lifecycle
+owns the per-user materialized runtime contract, relative to its data root:
 
 ```text
 service/versions/<version>/<payload>
 service/selection.json
 ```
 
-T50C writes `selection.json` and selects a version from that per-user store.
+The service lifecycle writes `selection.json` and selects a version from that
+per-user store.
 The package remains an immutable source for that copy. This keeps the
 installed version immutable and gives the lifecycle code a safe upgrade and
 rollback target without claiming a system-wide pointer.

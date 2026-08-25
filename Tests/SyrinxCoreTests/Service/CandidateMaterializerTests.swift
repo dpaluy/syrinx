@@ -42,7 +42,7 @@ final class CandidateMaterializerTests: XCTestCase {
         }
     }
 
-    func testOrdinaryT50BSourceModesMaterializeImmutableAndGroupWorldWritesFail() async throws {
+    func testOrdinaryReleaseSourceModesMaterializeImmutableAndGroupWorldWritesFail() async throws {
         do {
             let fixture = try MaterializerFixture()
             defer { fixture.cleanup() }
@@ -533,7 +533,7 @@ private struct MaterializerFixture {
     ) throws {
         self.packageDirectoryName = packageDirectoryName
         root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("t50c2a-fixture-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("candidate-fixture-\(UUID().uuidString)", isDirectory: true)
         let packageParent = root.appendingPathComponent(
             wrongPackageParent ? "not-a-package" : "package",
             isDirectory: true
@@ -878,13 +878,13 @@ private struct MaterializerFixture {
                     serviceLabel: serviceLabel
                 )
             ),
-            t50cRuntime: TrustedCandidateRuntimeLayout(
+            runtimeLifecycle: TrustedCandidateRuntimeLayout(
                 sourcePayloadRoot: relativeRoot,
-                materialization: "T50C copies the immutable versioned payload into its per-user service version store",
-                selection: "T50C lifecycle owns per-user version selection and rollback",
+                materialization: "The service copies the immutable payload into its per-user version store",
+                selection: "The service lifecycle owns per-user version selection and rollback",
                 dataRootRelativeVersionPath: "service/versions/{version}",
                 selectionRecord: "service/selection.json",
-                selectionRecordOwner: "T50C lifecycle",
+                selectionRecordOwner: "service lifecycle",
                 selectionField: "activeVersion"
             ),
             modelManifest: TrustedCandidateModelManifest(path: manifestPath, sha256: manifestDigest),

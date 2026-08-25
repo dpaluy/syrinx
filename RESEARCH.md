@@ -11,5 +11,5 @@ assets, names, package identity, or history from reference projects.
 - FluidAudio is pinned as the native runtime dependency and is used only
   through its public ASR API.
 
-The architecture plan at `private planning document`
-defines the selected clean Swift product shape.
+The implementation follows a clean Swift design derived from public API and
+behavioral evidence. Private planning files are not source inputs.

@@ -15,5 +15,5 @@ Third-party license files bundled with this repository:
 - `swift-collections-LICENSE.txt`, Apache License 2.0.
 - `yyjson-LICENSE.txt`, MIT License.
 
-Model license and attribution records will be added when the model manifest
-work is approved.
+The model manifest and third-party notices record the pinned model source,
+attribution, and unresolved license conflict. No model bytes are included.

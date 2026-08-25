@@ -1382,7 +1382,7 @@ private final class ValidationWorkspace {
 
     init(version: String) throws {
         root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("t50c2a-validation-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("candidate-validation-\(UUID().uuidString)", isDirectory: true)
         dataRoot = root.appendingPathComponent("data", isDirectory: true)
         versionDirectory = dataRoot
             .appendingPathComponent("service", isDirectory: true)

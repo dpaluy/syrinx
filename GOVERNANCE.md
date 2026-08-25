@@ -1,10 +1,13 @@
 # Governance
 
-The owner controls Syrinx architecture, dependency updates, release approval,
-and public publication.
+The repository owner is the maintainer and final decision maker for
+architecture, dependency updates, security fixes, and releases. Technical
+decisions use evidence from focused tests, public dependency documentation,
+and reproducible release checks.
 
-The source license is MIT. A public contributor process and maintainer list
-are not active yet.
+Issues and pull requests are the public record for proposed changes. The
+maintainer may decline changes that expand scope, weaken a security boundary,
+or add a dependency without a current requirement.
 
 Changes must preserve the clean-source boundary and must include focused tests
 for observable behavior. A dependency update requires a review of its public

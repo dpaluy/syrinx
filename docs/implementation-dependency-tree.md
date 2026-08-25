@@ -1,36 +1,44 @@
-# Implementation dependency tree
+# Implementation and verification status
 
-The implementation stages and dependencies are fixed for this plan:
+Syrinx uses independent layers so each security boundary can be tested before
+it is composed into the service.
 
 ```text
-T00 bootstrap
-├── T01 FluidAudio proof
-├── T02 model-manifest proof
-└── T03 HTTP upload proof
-
-T10 runtime integration       <- T00 + T01
-T20 model lifecycle           <- T00 + T02
-T30 safe transcription        <- T10 + T20
-T40 HTTP service              <- T30 + T03
-T50 packaging/release         <- T40
-T60 full verification         <- T00 + T01 + T02 + T03 + T10 + T20 + T30 + T40 + T50
+CLI and configuration
+        |
+        +--> model download, verification, and lifecycle
+        |
+        +--> bounded audio preparation --> FluidAudio runtime
+        |                                  |
+        +--> loopback HTTP transport ------+
+        |
+        +--> per-user service lifecycle
+        |
+        +--> trusted packaging and release verification
 ```
 
-| Stage | Meaning | Depends on |
-|---|---|---|
-| T00 | bootstrap | none |
-| T01 | FluidAudio proof | none |
-| T02 | model-manifest proof | none |
-| T03 | HTTP upload proof | none |
-| T10 | runtime integration | T00, T01 |
-| T20 | model lifecycle | T00, T02 |
-| T30 | safe transcription | T10, T20 |
-| T40 | HTTP service | T30, T03 |
-| T50 | packaging/release | T40 |
-| T60 | full verification | T00, T01, T02, T03, T10, T20, T30, T40, T50 |
+## Automated evidence
 
-T00 through T50 are implemented on `cdx/syrinx-finalize`. The available T60
-automated checks pass: 430 tests ran with 6 real-model cases skipped because a
-managed model revision and audio fixture are not present. Release verification
-still requires approved owner and security metadata, model license review,
-Apple signing, notarization, and clean-machine evidence.
+| Area | Current automated coverage |
+|---|---|
+| Configuration and paths | Typed values, loopback-only host, private managed paths |
+| Model lifecycle | Pinned manifest, hashes, resume, activation, rollback, locking, cleanup |
+| Audio | WAV validation, size and duration bounds, normalized private temporary files |
+| Runtime | Single-load coordination, admission bounds, cancellation, drain behavior |
+| HTTP | Authentication, bounded multipart input, overload, timeout, disconnect cleanup |
+| Service lifecycle | LaunchAgent identity, trusted configuration, logs, start and stop ordering |
+| Packaging | Exact tag, source archive, inventory, checksums, SBOM, provenance, model exclusion |
+
+## Environment-dependent evidence
+
+The default test suite does not claim the following checks:
+
+- transcription with the pinned real model and an approved audio fixture;
+- Developer ID signing;
+- Apple notarization and stapling;
+- Gatekeeper assessment under quarantine;
+- installation and removal on a clean supported Mac;
+- publication of release assets.
+
+These checks remain binary release gates. See
+[release-gates.md](release-gates.md) for the required evidence.

@@ -34,7 +34,7 @@ final class ModelCommandsTests: XCTestCase {
         let result = CommandRunner(environment: [:]).run(arguments: ["models", "list"])
 
         XCTAssertEqual(result.exitCode, 2)
-        XCTAssertFalse(result.stderr.contains("T00"))
+        XCTAssertFalse(result.stderr.contains("placeholder"))
         XCTAssertTrue(result.stderr.contains("async execution"))
     }
 

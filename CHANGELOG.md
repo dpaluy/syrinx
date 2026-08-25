@@ -2,8 +2,7 @@
 
 ## Unreleased
 
-- Renamed the native service from its private development placeholder to
-  Syrinx.
+- Prepared the initial pre-release source for Syrinx and Parrot.
 - Added the MIT source license and third-party attribution records.
 - Added the native FluidAudio runtime, model lifecycle, loopback HTTP service,
   LaunchAgent lifecycle, and trusted release tooling.

@@ -60,6 +60,8 @@ public struct CommandRunner {
         }
 
         switch command {
+        case "--help", "help":
+            return CommandResult(exitCode: 0, stdout: usage)
         case "version":
             return runVersion(options: Array(arguments.dropFirst()))
         case "doctor":
@@ -181,6 +183,18 @@ public struct CommandRunner {
     }
 
     private var usage: String {
-        "usage: syrinx <version|doctor> [--json]\n"
+        """
+        usage: syrinx <command> [options]
+
+        commands:
+          version      Show build and version information.
+          doctor       Check configuration, paths, port, and model state.
+          models       Install, verify, select, and manage model revisions.
+          transcribe   Transcribe a local WAV file.
+          serve        Run the loopback HTTP service in the foreground.
+          service      Install and manage the per-user background service.
+
+        Run `syrinx <command>` without arguments to see command-specific usage.
+        """ + "\n"
     }
 }

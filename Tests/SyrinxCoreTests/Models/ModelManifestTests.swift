@@ -14,7 +14,7 @@ final class ModelManifestTests: XCTestCase {
         XCTAssertEqual(manifest.totalSize, 483_105_645)
         XCTAssertEqual(
             manifest.manifestContentDigest.hex,
-            "3967d537c8ed54cc46586cdaa7eec5d61c9cb9ea7bf4d16039ffb773102326d9"
+            "0b0210f587dc82a5b5f85bd4162bc585958400027639ef36399fc44e7a963d1f"
         )
     }
 

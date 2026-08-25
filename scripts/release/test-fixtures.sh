@@ -205,7 +205,7 @@ def base_env(root, output, version, commit, binary):
     return result
 
 
-with tempfile.TemporaryDirectory(prefix="t50b-fixtures-") as temporary:
+with tempfile.TemporaryDirectory(prefix="syrinx-release-fixtures-") as temporary:
     temporary_root = Path(temporary)
     forbidden = temporary_root / "forbidden-tools"
     forbidden.mkdir()
@@ -464,25 +464,25 @@ with tempfile.TemporaryDirectory(prefix="t50b-fixtures-") as temporary:
     check("installLayout" not in release_metadata, "release metadata contains the removed false layout field")
     check("currentPointer" not in release_metadata["deliveryLayouts"]["package"], "package metadata contains a nonexistent pointer")
     check(release_metadata["deliveryLayouts"]["homebrew"]["currentPointer"].startswith("not applicable"), "Homebrew pointer contract is false")
-    t50c_runtime = release_metadata["t50cRuntime"]
-    check(t50c_runtime["dataRootRelativeVersionPath"] == "service/versions/{version}", "T50C version-store contract is not machine-usable")
-    check(t50c_runtime["selectionRecord"] == "service/selection.json", "T50C selection record contract is missing")
-    check(t50c_runtime["selectionRecordOwner"] == "T50C lifecycle", "T50C selection ownership is not explicit")
-    check(not t50c_runtime["dataRootRelativeVersionPath"].startswith("/"), "T50C version-store contract contains an absolute path")
-    t50c_data_root = temporary_root / "per-user-data"
-    t50c_version_root = t50c_data_root / "service" / "versions" / "1.2.3"
-    shutil.copytree(formula_payload, t50c_version_root)
-    selection_record = t50c_data_root / "service" / "selection.json"
+    runtime_lifecycle = release_metadata["runtimeLifecycle"]
+    check(runtime_lifecycle["dataRootRelativeVersionPath"] == "service/versions/{version}", "runtime version-store contract is not machine-usable")
+    check(runtime_lifecycle["selectionRecord"] == "service/selection.json", "runtime selection record contract is missing")
+    check(runtime_lifecycle["selectionRecordOwner"] == "service lifecycle", "runtime selection ownership is not explicit")
+    check(not runtime_lifecycle["dataRootRelativeVersionPath"].startswith("/"), "runtime version-store contract contains an absolute path")
+    service_data_root = temporary_root / "per-user-data"
+    service_version_root = service_data_root / "service" / "versions" / "1.2.3"
+    shutil.copytree(formula_payload, service_version_root)
+    selection_record = service_data_root / "service" / "selection.json"
     write(selection_record, json.dumps({"schemaVersion": 1, "activeVersion": "1.2.3"}, sort_keys=True) + "\n")
-    check(selection_record.is_file() and json.loads(selection_record.read_text(encoding="utf-8"))["activeVersion"] == "1.2.3", "T50C selection fixture did not create the per-user record")
+    check(selection_record.is_file() and json.loads(selection_record.read_text(encoding="utf-8"))["activeVersion"] == "1.2.3", "service lifecycle fixture did not create the per-user record")
     for payload_path in sorted(formula_contract):
         relative = payload_path[2:]
         if formula_contract[payload_path] == "file":
-            check((formula_payload / relative).read_bytes() == (t50c_version_root / relative).read_bytes(), "T50C materialized payload differs: " + relative)
+            check((formula_payload / relative).read_bytes() == (service_version_root / relative).read_bytes(), "materialized service payload differs: " + relative)
     check(not any(path.name == "current" for path in formula_payload.rglob("*")), "package payload contains a nonexistent current pointer")
     counts["layout"] += 1
 
-    copy_root = Path(subprocess.check_output(["/usr/bin/mktemp", "-d", "/tmp/t50b-copy-XXXXXX"], text=True).strip())
+    copy_root = Path(subprocess.check_output(["/usr/bin/mktemp", "-d", "/tmp/syrinx-release-copy-XXXXXX"], text=True).strip())
     try:
         copy_source = copy_root / "source"
         copy_destination = copy_root / "destination"
@@ -671,7 +671,7 @@ with tempfile.TemporaryDirectory(prefix="t50b-fixtures-") as temporary:
         os.close(publication_directory_fd)
 
     def expect_output_attack(label, mutate):
-        target = Path(tempfile.mkdtemp(prefix="t50b-output-attack-", dir="/tmp"))
+        target = Path(tempfile.mkdtemp(prefix="syrinx-output-attack-", dir="/tmp"))
         shutil.rmtree(target)
         try:
             shutil.copytree(output_one, target)
@@ -1832,11 +1832,11 @@ with tempfile.TemporaryDirectory(prefix="t50b-fixtures-") as temporary:
         prepare_code = r'''
 import json, os, signal, sys
 from pathlib import Path
-sys.path.insert(0, os.environ["T50B_SCRIPT_DIR"])
+sys.path.insert(0, os.environ["RELEASE_FIXTURE_SCRIPT_DIR"])
 import release
-args = release.argparse.Namespace(**json.loads(os.environ["T50B_ARGS"]))
-list_path = Path(os.environ["T50B_LIST_STATE"])
-boundary = os.environ["T50B_BOUNDARY"]
+args = release.argparse.Namespace(**json.loads(os.environ["RELEASE_FIXTURE_ARGS"]))
+list_path = Path(os.environ["RELEASE_FIXTURE_LIST_STATE"])
+boundary = os.environ["RELEASE_FIXTURE_BOUNDARY"]
 def tool(argv, cwd=None, timeout=release.MAX_TOOL_SECONDS, env=None, input_bytes=None):
     if argv[:3] == ["security", "list-keychains", "-d"]:
         if "-s" in argv:
@@ -1856,7 +1856,7 @@ if boundary == "env":
     release.write_github_env = lambda values, github_env: os.kill(os.getpid(), signal.SIGKILL)
 release.prepare_signing(args)
 '''
-        prepare_env = dict(os.environ, T50B_SCRIPT_DIR=str(script_dir), T50B_ARGS=json.dumps(values), T50B_LIST_STATE=str(list_state), T50B_BOUNDARY=label)
+        prepare_env = dict(os.environ, RELEASE_FIXTURE_SCRIPT_DIR=str(script_dir), RELEASE_FIXTURE_ARGS=json.dumps(values), RELEASE_FIXTURE_LIST_STATE=str(list_state), RELEASE_FIXTURE_BOUNDARY=label)
         child = subprocess.run([sys.executable, "-c", prepare_code], env=prepare_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         check(child.returncode == -signal.SIGKILL, "prepare did not terminate by SIGKILL at " + label)
         recorded_list = json.loads(list_state.read_text(encoding="utf-8"))
@@ -1867,9 +1867,9 @@ release.prepare_signing(args)
         cleanup_code = r'''
 import json, os, sys
 from pathlib import Path
-sys.path.insert(0, os.environ["T50B_SCRIPT_DIR"])
+sys.path.insert(0, os.environ["RELEASE_FIXTURE_SCRIPT_DIR"])
 import release
-case_root = Path(os.environ["T50B_CASE_ROOT"])
+case_root = Path(os.environ["RELEASE_FIXTURE_CASE_ROOT"])
 list_path = case_root / "keychains.json"
 def tool(argv, cwd=None, timeout=release.MAX_TOOL_SECONDS, env=None, input_bytes=None):
     if argv[:3] == ["security", "list-keychains", "-d"]:
@@ -1887,7 +1887,7 @@ release.cleanup_signing_state(
     None, None, None,
 )
 '''
-        cleanup_env = dict(os.environ, T50B_SCRIPT_DIR=str(script_dir), T50B_CASE_ROOT=str(case_root))
+        cleanup_env = dict(os.environ, RELEASE_FIXTURE_SCRIPT_DIR=str(script_dir), RELEASE_FIXTURE_CASE_ROOT=str(case_root))
         cleanup = subprocess.run([sys.executable, "-c", cleanup_code], env=cleanup_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         check(cleanup.returncode != 0 and b"state-missing" in cleanup.stderr, "SIGKILL cleanup did not fail closed at " + label + ": " + cleanup.stderr.decode(errors="replace"))
         check(json.loads(list_state.read_text(encoding="utf-8")) == old_list, "cleanup did not restore prior keychains at " + label)

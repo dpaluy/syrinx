@@ -1,44 +1,85 @@
 # Syrinx
 
-Syrinx is one macOS project for local Parakeet dictation. It contains the
-native speech service and the Parrot push-to-talk client in one repository.
+Syrinx is a macOS project for private, local speech-to-text. It contains:
 
-## Components
+- **Parrot**, a push-to-talk dictation client that records while you hold the
+  Fn key and inserts the transcript at the cursor.
+- **Syrinx**, a native Parakeet transcription service that runs on the local
+  Mac and provides a loopback HTTP API.
 
-- `syrinx`: native Swift service for Parakeet transcription. It manages the
-  model store, loopback HTTP endpoint, and per-user LaunchAgent.
-- `parrot`: macOS push-to-talk client. It captures audio, calls Syrinx through
-  the loopback adapter, and inserts the transcript at the cursor.
+Audio stays on the Mac. Neither component supports cloud transcription.
 
-The service listens on `127.0.0.1:5092` by default. Model bytes are not stored
-in Git or bundled in a release.
+## Project status
+
+Syrinx is pre-release software. Source builds are available. Signed and
+notarized installers are not available yet.
+
+The Parrot client uses WhisperKit with the English Whisper Base model by
+default. The optional Syrinx service uses Parakeet. The unresolved Parakeet
+model-license metadata blocks a binary release, as documented in
+[the model license review](docs/model-license-review.md).
+
+## Requirements
+
+- Apple Silicon Mac
+- macOS 14 or later
+- Xcode 16 or later, or matching Swift 6 command-line tools
+- Internet access for the first Whisper model download
 
 ## Quick start
 
-Build and test both components from the repository root:
+Build the Parrot dictation client from the repository root:
 
 ```sh
-./scripts/test-all.sh
+swift build --package-path parrot --configuration release
 ```
 
-Install the pinned model and start the native service:
+Grant microphone and Accessibility access to the terminal that will run
+Parrot:
 
 ```sh
-swift run syrinx models install --activate
-swift run syrinx service install
-swift run syrinx service start
+./parrot/.build/release/parrot setup
 ```
 
-Configure Parrot permissions, then run it with Syrinx:
+Start dictation:
 
 ```sh
-cd parrot
-swift run parrot setup
-swift run parrot run --model parakeet-tdt-0.6b-v3 --syrinx-url http://127.0.0.1:5092
+./parrot/.build/release/parrot
 ```
 
-The Parrot client also supports WhisperKit models. Docker is not required for
-the native Syrinx path.
+The first launch downloads and loads the recommended Whisper Base English
+model. When Parrot reports that it is listening, hold Fn, speak, and release
+Fn. Press Control-C in the terminal to stop it.
+
+See [the Parrot guide](parrot/README.md) for model choices, launch-at-login,
+permission troubleshooting, and the optional Syrinx service.
+
+## Optional Parakeet service
+
+Build the native Syrinx service:
+
+```sh
+swift build --configuration release
+./.build/release/syrinx --help
+./.build/release/syrinx doctor
+```
+
+Before installing the Parakeet model, read the
+[model license review](docs/model-license-review.md). Model bytes are
+downloaded from the pinned upstream source and are never stored in this
+repository or bundled in a release.
+
+```sh
+./.build/release/syrinx models install --activate
+./.build/release/syrinx service install
+./.build/release/syrinx service start
+./parrot/.build/release/parrot run \
+  --model parakeet-tdt-0.6b-v3 \
+  --syrinx-url http://127.0.0.1:5092
+```
+
+The service binds to `127.0.0.1:5092` by default and rejects non-loopback
+hosts.
 
 ## Repository layout
 
@@ -46,28 +87,48 @@ the native Syrinx path.
 Sources/SyrinxCore/     Native service library
 Sources/syrinx/         Native service executable
 Tests/                  Native service tests
-parrot/Package.swift    Parrot client package
-parrot/Sources/         Parrot client executable
-parrot/Tests/            Parrot client tests
-scripts/test-all.sh     One command for both test suites
+parrot/Sources/         Push-to-talk client source
+parrot/Tests/           Push-to-talk client tests
+docs/                   Architecture and release documentation
+scripts/                Contributor and release verification tools
+Packaging/              Installer and package contracts
 ```
 
-The repository root is the native Swift package. The Parrot client is a
-nested Swift package so each executable keeps its own dependency graph while
-Git, documentation, CI, and release work stay in one project.
+Syrinx and Parrot are separate Swift packages so each executable has an
+independent dependency graph.
 
-## Development commands
+## Development
+
+Build both packages:
 
 ```sh
 swift build
-swift test
-swift run syrinx version --json
-swift run syrinx doctor --json
-cd parrot && swift build && swift test
+swift build --package-path parrot
 ```
 
-Syrinx targets macOS 14 or later on Apple Silicon. The source license is MIT.
-The model license review, owner and security metadata, Apple signing and
-notarization, and clean-machine release verification remain open release
-gates. See [docs/release-gates.md](docs/release-gates.md) and
-[docs/model-license-review.md](docs/model-license-review.md).
+Run the test suites and repository checks:
+
+```sh
+./scripts/test-all.sh
+./scripts/clean-source-audit.sh
+./scripts/release/validate-workflow.sh
+```
+
+Real-model integration tests require separately managed model and audio
+fixtures. Tests that need those fixtures report a skip when they are absent.
+
+## Documentation
+
+- [Native service](docs/native-service.md)
+- [Parrot architecture](parrot/docs/architecture.md)
+- [Compatibility](COMPATIBILITY.md)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+- [Release gates](docs/release-gates.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+
+## License
+
+Syrinx source is available under the [MIT License](LICENSE). Dependencies and
+models retain their own terms. See [the license inventory](LICENSES/README.md)
+and [third-party notices](THIRD_PARTY_NOTICES.md).

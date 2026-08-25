@@ -1,7 +1,6 @@
 # Release operations
 
-T50B prepares trusted release machinery for Syrinx. It does not perform a real
-release in local tests.
+The trusted release machinery does not perform a real release in local tests.
 
 ## Protected runner
 
@@ -140,7 +139,7 @@ only unsigned local `pkgbuild` and `pkgutil` for the payload-listing probe. It
 never calls signing, notarization, stapling, Gatekeeper, package installation,
 Homebrew, GitHub, network, or publication commands.
 
-On this Codex macOS host, Python-created filesystem nodes receive a host
+On some macOS hosts, Python-created filesystem nodes receive a host
 `com.apple.provenance` attribute that Darwin does not remove through
 `fremovexattr`, including through `/dev/fd/<held-descriptor>`. The fixture
 therefore records the real APFS package probe and descriptor-copy positives as
@@ -153,5 +152,5 @@ limitation, not an allowlist or a successful signed-package claim.
 ```
 
 The fixture suite also runs an unsigned dry-run and records the generated
-inventory, hashes, model boundary checks, and package-layout names in the
-T50B evidence file.
+inventory, hashes, model boundary checks, and package-layout names in its
+temporary output.

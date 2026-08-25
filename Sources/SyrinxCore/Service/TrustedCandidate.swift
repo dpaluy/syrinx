@@ -243,7 +243,7 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
     public let installerIdentity: String
     public let compatibility: TrustedCandidateCompatibility
     public let deliveryLayouts: TrustedCandidateDeliveryLayouts
-    public let t50cRuntime: TrustedCandidateRuntimeLayout
+    public let runtimeLifecycle: TrustedCandidateRuntimeLayout
     public let modelManifest: TrustedCandidateModelManifest
     public let swiftResourceBundle: String?
     public let formulaClass: String
@@ -266,7 +266,7 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
         case installerIdentity
         case compatibility
         case deliveryLayouts
-        case t50cRuntime
+        case runtimeLifecycle
         case modelManifest
         case swiftResourceBundle
         case formulaClass
@@ -290,7 +290,7 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
         installerIdentity: String,
         compatibility: TrustedCandidateCompatibility,
         deliveryLayouts: TrustedCandidateDeliveryLayouts,
-        t50cRuntime: TrustedCandidateRuntimeLayout,
+        runtimeLifecycle: TrustedCandidateRuntimeLayout,
         modelManifest: TrustedCandidateModelManifest,
         swiftResourceBundle: String?,
         formulaClass: String,
@@ -312,7 +312,7 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
         self.installerIdentity = installerIdentity
         self.compatibility = compatibility
         self.deliveryLayouts = deliveryLayouts
-        self.t50cRuntime = t50cRuntime
+        self.runtimeLifecycle = runtimeLifecycle
         self.modelManifest = modelManifest
         self.swiftResourceBundle = swiftResourceBundle
         self.formulaClass = formulaClass
@@ -329,7 +329,7 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
               let deliveryLayouts = object["deliveryLayouts"] as? [String: Any],
               let package = deliveryLayouts["package"] as? [String: Any],
               let homebrew = deliveryLayouts["homebrew"] as? [String: Any],
-              let runtime = object["t50cRuntime"] as? [String: Any],
+              let runtime = object["runtimeLifecycle"] as? [String: Any],
               let modelManifest = object["modelManifest"] as? [String: Any]
         else {
             throw TrustedCandidateError.invalidMetadata
@@ -368,7 +368,7 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
     private static let metadataKeys: Set<String> = [
         "schemaVersion", "productIdentity", "executable", "packageIdentifier", "serviceLabel",
         "version", "tag", "source", "owner", "securityContact", "teamId", "applicationIdentity",
-        "installerIdentity", "compatibility", "deliveryLayouts", "t50cRuntime", "modelManifest",
+        "installerIdentity", "compatibility", "deliveryLayouts", "runtimeLifecycle", "modelManifest",
         "swiftResourceBundle", "formulaClass", "buildTimestamp", "unsignedDryRun"
     ]
 
@@ -450,15 +450,15 @@ public struct TrustedCandidateMetadata: Codable, Equatable, Sendable {
             throw TrustedCandidateError.invalidField("deliveryLayouts")
         }
 
-        guard t50cRuntime.sourcePayloadRoot == relativeRoot,
-              t50cRuntime.dataRootRelativeVersionPath == "service/versions/{version}",
-              t50cRuntime.selectionRecord == "service/selection.json",
-              t50cRuntime.selectionRecordOwner == "T50C lifecycle",
-              t50cRuntime.selectionField == "activeVersion",
-              t50cRuntime.materialization == "T50C copies the immutable versioned payload into its per-user service version store",
-              t50cRuntime.selection == "T50C lifecycle owns per-user version selection and rollback"
+        guard runtimeLifecycle.sourcePayloadRoot == relativeRoot,
+              runtimeLifecycle.dataRootRelativeVersionPath == "service/versions/{version}",
+              runtimeLifecycle.selectionRecord == "service/selection.json",
+              runtimeLifecycle.selectionRecordOwner == "service lifecycle",
+              runtimeLifecycle.selectionField == "activeVersion",
+              runtimeLifecycle.materialization == "The service copies the immutable payload into its per-user version store",
+              runtimeLifecycle.selection == "The service lifecycle owns per-user version selection and rollback"
         else {
-            throw TrustedCandidateError.invalidField("t50cRuntime")
+            throw TrustedCandidateError.invalidField("runtimeLifecycle")
         }
     }
 

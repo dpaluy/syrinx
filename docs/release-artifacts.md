@@ -1,6 +1,6 @@
 # Release artifacts
 
-This document defines the T50B output contract. The release tool accepts the
+This document defines the release output contract. The release tool accepts the
 final product identity and all public release metadata as inputs. The selected
 source identity is `Syrinx`, with executable `syrinx`, package identifier
 `com.dpaluy.syrinx`, and service label `com.dpaluy.syrinx`. It rejects a
@@ -56,8 +56,8 @@ excludes itself and its detached signature for the same reason. The detached
 signature covers the complete checksum file.
 
 The signed package is staged on a temporary APFS volume auto-mounted by
-`hdiutil` at a unique `/Volumes/<volume>` path. T50B copies payload bytes and
-modes once with `/bin/cp -X`, enumerates metadata on pinned descriptors, and
+`hdiutil` at a unique `/Volumes/<volume>` path. The release tool copies payload
+bytes and modes once with `/bin/cp -X`, enumerates metadata on pinned descriptors, and
 fails on every xattr, file flag, ACL, link, or special entry. A singleton
 host-added `com.apple.provenance` may be removed only with `fremovexattr` on
 the held destination descriptor, followed by an empty descriptor enumeration.
@@ -95,14 +95,14 @@ The package installs the executable and metadata below the immutable path:
   docs/CHANGELOG.md
 ```
 
-The package does not create a `current` pointer. T50B provides only the
-immutable package source layout above. T50C copies that versioned payload into
-its accepted per-user service version store and owns per-user version
-selection and rollback. The T50B metadata records this ownership without
-inventing a filesystem path. Homebrew uses a separate Cellar layout: it
+The package does not create a `current` pointer. The release tool provides only
+the immutable package source layout above. The service lifecycle copies that
+versioned payload into its accepted per-user service version store and owns
+per-user version selection and rollback. Release metadata records this
+ownership without inventing a filesystem path. Homebrew uses a separate Cellar layout: it
 copies the same versioned payload contents into `libexec` and creates a `bin`
 symlink. Normal uninstall and retention of model and configuration data
-remain outside T50B.
+remain outside the package contract.
 
 When the SwiftPM resource bundle is present, its exact regular-file inventory
 contains only the approved model manifest. The public manifest, embedded
@@ -137,10 +137,10 @@ unknown or unproven system names, Homebrew paths, Xcode and
 `/Library/Developer` paths, canonicalized loader escapes, unresolved tokens,
 prohibited rpaths, and unreferenced bundled dylibs.
 
-T50B does not claim that `metadata/release.json` is cryptographically bound to
-the executable. The current runtime `BuildInfo` path is outside T50B
-ownership and does not yet provide an embedded exact version and source
-commit. T50C must make the build identity embedded or otherwise signature
+The release tool does not claim that `metadata/release.json` is
+cryptographically bound to the executable. The current runtime `BuildInfo`
+path does not yet provide an embedded exact version and source commit. The
+service lifecycle must make the build identity embedded or otherwise signature
 bound, then compare it with the candidate metadata before activation. This is
 a required cross-stack release gate.
 

@@ -3,6 +3,20 @@ import XCTest
 @testable import SyrinxCore
 
 final class CommandContractTests: XCTestCase {
+    func testTopLevelHelpListsEveryCommand() {
+        let runner = CommandRunner(environment: [:])
+
+        for arguments in [["--help"], ["help"]] {
+            let result = runner.run(arguments: arguments)
+
+            XCTAssertEqual(result.exitCode, 0)
+            XCTAssertTrue(result.stderr.isEmpty)
+            for command in ["version", "doctor", "models", "transcribe", "serve", "service"] {
+                XCTAssertTrue(result.stdout.contains(command), "missing \(command) from help")
+            }
+        }
+    }
+
     func testServeIsAsyncOnlyAndSynchronousRunRemainsExplicit() async {
         let runner = CommandRunner(environment: [:])
 

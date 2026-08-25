@@ -4,20 +4,23 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   native:
     runs-on: macos-26
     steps:
       # Reviewed v4 tag, pinned to immutable commit 11d5960a326750d5838078e36cf38b85af677262.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Clean source audit
+        run: ./scripts/clean-source-audit.sh
+      - name: Validate release workflow
+        run: ./scripts/release/validate-workflow.sh
       - name: Build
         run: swift build
       - name: Test
         run: swift test
-      - name: Clean source audit
-        run: ./scripts/clean-source-audit.sh
-      - name: Check em dash characters
-        run: "! rg -n '\\x{2014}' --hidden --glob '!.git/**' --glob '!.build/**' --glob '!**/.build/**' --glob '!scripts/clean-source-audit.sh' ."
 
   parrot:
     runs-on: macos-26

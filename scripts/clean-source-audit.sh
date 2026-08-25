@@ -16,4 +16,10 @@ if rg -n '\x{2014}' --hidden --glob '!.git/**' --glob '!.build/**' --glob '!**/.
   exit 1
 fi
 
+if rg -n '(/Users|/home)/[^/<`[:space:]]+/' --glob '*.md' \
+  --glob '!.build/**' --glob '!**/.build/**' --glob '!.git/**' .; then
+  echo "documentation contains a machine-specific home-directory path" >&2
+  exit 1
+fi
+
 echo "clean-source audit passed"

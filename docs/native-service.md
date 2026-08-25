@@ -41,7 +41,8 @@ Version JSON includes `project_version`, `commit`, `build_target`, `build_date`,
 ## Release status
 
 The product identity is `Syrinx`, the executable is `syrinx`, and the source
-license is MIT. Public release remains blocked by the model license conflict,
-missing owner and security contact metadata, Apple signing and notarization,
-and clean-machine verification. See [release-gates.md](release-gates.md)
-and [model-license-review.md](model-license-review.md).
+license is MIT. Source builds are available. A signed binary release remains
+blocked by the model license conflict, release owner and security metadata,
+Apple signing and notarization, and clean-machine verification. See
+[release-gates.md](release-gates.md) and
+[model-license-review.md](model-license-review.md).

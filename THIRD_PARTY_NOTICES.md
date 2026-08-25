@@ -9,8 +9,8 @@
 - Bundled license: [LICENSES/FluidAudio-LICENSE.txt](LICENSES/FluidAudio-LICENSE.txt)
 - License source: [FluidAudio LICENSE](https://github.com/FluidInference/FluidAudio/blob/19600a485baa4998812e4654b70d2bab8f2c9949/LICENSE)
 
-This T10A slice uses FluidAudio only through its public ASR API. Model files are
-not included. T10B owns model staging and model-specific attribution review.
+Syrinx uses FluidAudio only through its public ASR API. Model files are not
+included. Model staging and attribution are handled separately.
 
 ## Hummingbird
 
@@ -50,8 +50,8 @@ The Parrot component retains its original MIT notice in
 `parrot/LICENSE`. License texts for the Parrot dependency graph are copied
 under `LICENSES/`.
 
-Core ML model attribution and license records must be added when the model
-manifest work is approved. No model bytes are present in this repository.
+The model manifest records Core ML model attribution and the unresolved
+license conflict. No model bytes are present in this repository.
 
 ## Parakeet TDT 0.6B v3 Core ML model
 

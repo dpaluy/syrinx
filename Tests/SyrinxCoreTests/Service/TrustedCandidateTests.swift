@@ -5,7 +5,7 @@ import XCTest
 @testable import SyrinxCore
 
 final class TrustedCandidateTests: XCTestCase {
-    func testValidCandidateBindsRealT50BMetadataManifestArchitectureAndSignatureEvidence() throws {
+    func testValidCandidateBindsReleaseMetadataManifestArchitectureAndSignatureEvidence() throws {
         let fixture = try CandidateFixture()
         defer { fixture.cleanup() }
 
@@ -139,7 +139,7 @@ final class TrustedCandidateTests: XCTestCase {
         }
     }
 
-    func testCertificateIdentityRequiresExactT50BFullString() throws {
+    func testCertificateIdentityRequiresExactReleaseIdentity() throws {
         let fixture = try CandidateFixture()
         defer { fixture.cleanup() }
 
@@ -189,7 +189,7 @@ final class TrustedCandidateTests: XCTestCase {
                     installerIdentity: CandidateFixture.installerIdentity,
                     compatibility: CandidateFixture.compatibility,
                     deliveryLayouts: CandidateFixture.deliveryLayouts(version: unsafeVersion),
-                    t50cRuntime: CandidateFixture.runtimeLayout(version: unsafeVersion),
+                    runtimeLifecycle: CandidateFixture.runtimeLayout(version: unsafeVersion),
                     modelManifest: CandidateFixture.modelManifest,
                     swiftResourceBundle: CandidateFixture.bundleName,
                     formulaClass: CandidateFixture.formulaClass,
@@ -488,7 +488,7 @@ final class TrustedCandidateTests: XCTestCase {
             installerIdentity: CandidateFixture.installerIdentity,
             compatibility: CandidateFixture.compatibility,
             deliveryLayouts: CandidateFixture.deliveryLayouts(version: "1.2.4"),
-            t50cRuntime: CandidateFixture.runtimeLayout(version: "1.2.4"),
+            runtimeLifecycle: CandidateFixture.runtimeLayout(version: "1.2.4"),
             modelManifest: CandidateFixture.modelManifest,
             swiftResourceBundle: CandidateFixture.bundleName,
             formulaClass: CandidateFixture.formulaClass,
@@ -683,7 +683,7 @@ private struct CandidateFixture {
             installerIdentity: installerIdentity,
             compatibility: compatibility,
             deliveryLayouts: deliveryLayouts(version: version),
-            t50cRuntime: runtimeLayout(version: version),
+            runtimeLifecycle: runtimeLayout(version: version),
             modelManifest: modelManifest,
             swiftResourceBundle: bundleName,
             formulaClass: formulaClass,
@@ -718,11 +718,11 @@ private struct CandidateFixture {
         let relativeRoot = "Library/Application Support/\(productIdentity)/versions/\(version)"
         return TrustedCandidateRuntimeLayout(
             sourcePayloadRoot: relativeRoot,
-            materialization: "T50C copies the immutable versioned payload into its per-user service version store",
-            selection: "T50C lifecycle owns per-user version selection and rollback",
+            materialization: "The service copies the immutable payload into its per-user version store",
+            selection: "The service lifecycle owns per-user version selection and rollback",
             dataRootRelativeVersionPath: "service/versions/{version}",
             selectionRecord: "service/selection.json",
-            selectionRecordOwner: "T50C lifecycle",
+            selectionRecordOwner: "service lifecycle",
             selectionField: "activeVersion"
         )
     }

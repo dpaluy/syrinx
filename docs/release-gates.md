@@ -1,6 +1,7 @@
-# Release gates
+# Binary release gates
 
-Public release is blocked until all of these decisions have evidence:
+A public source repository does not claim that a signed binary release exists.
+A signed binary release is blocked until all of these decisions have evidence:
 
 1. Record the selected product name `Syrinx`, executable `syrinx`, environment
    prefix `SYRINX_`, package identity `com.dpaluy.syrinx`, service label
@@ -12,6 +13,7 @@ Public release is blocked until all of these decisions have evidence:
 5. Complete native runtime, model lifecycle, HTTP contract, signing, and
    clean-machine verification in the later dependency tree stages.
 
-The identity and source-license decisions are complete. Public release remains
-blocked until the owner and security contact, model license review, signing,
-notarization, and clean-machine verification have evidence.
+The identity, source license, repository support process, and private
+vulnerability-reporting process are defined. A signed binary release remains
+blocked until the release owner and security metadata, model license review,
+Apple signing, notarization, and clean-machine verification have evidence.

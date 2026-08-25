@@ -366,7 +366,7 @@
   },
   "manifestContentDigest": {
     "algorithm": "SHA-256",
-    "hex": "3967d537c8ed54cc46586cdaa7eec5d61c9cb9ea7bf4d16039ffb773102326d9",
+    "hex": "0b0210f587dc82a5b5f85bd4162bc585958400027639ef36399fc44e7a963d1f",
     "procedure": "Serialize this JSON as UTF-8 with LF line endings, recursively sort object keys, preserve array order, remove the manifestContentDigest property, emit compact JSON with no trailing newline, then hash the bytes with SHA-256.",
     "selfExclusion": "The manifestContentDigest property is excluded before hashing to avoid a self-reference."
   },
@@ -374,7 +374,7 @@
     "status": "open",
     "reasons": [
       "This commit is a proposed v0.1 baseline, not an approved release revision.",
-      "T02 verifies the file tree and hashes but does not prove a successful Core ML load and transcription through FluidAudio.",
+      "File-tree and hash verification does not prove a successful Core ML load and transcription through FluidAudio.",
       "The model card declares CC BY 4.0, but the Hugging Face API top-level license field is null and requires release review."
     ]
   }

@@ -1,33 +1,37 @@
 # Parrot client
 
 Parrot is the push-to-talk client in the Syrinx repository. It captures audio,
-calls the native Syrinx service, and inserts the transcript at the cursor.
+uses in-process WhisperKit or an optional loopback service, and inserts the
+transcript at the cursor.
 
-## Build from the Syrinx repository
+## Quick start
 
 ```sh
-cd parrot
-swift build -c release
-swift test
-swift run parrot setup
+swift build --configuration release
+.build/release/parrot setup
+.build/release/parrot
 ```
 
-Parrot requires macOS 14 or later on Apple Silicon. A binary installer is not
-published yet. Use the source build while the unified Syrinx release process
-is being completed.
+Run these commands from the `parrot` directory. Parrot requires macOS 14 or
+later on Apple Silicon and Swift 6. The first launch downloads the recommended
+145 MB Whisper Base English model. A signed binary installer is not published
+yet.
 
 ## How to use
 
 1. **Run it.** Either `parrot install --launch-at-login` (daemonized, runs forever, lives in the menu bar), or `parrot` in any terminal tab.
 2. **Click into the text field you want to dictate into**  -  Messages, the address bar, a Slack thread, anywhere a cursor blinks.
 3. **Hold the `fn` key, speak, release.** A small pill appears at the bottom of the screen while the mic is hot.
-4. **The transcript types itself in at the cursor** when you release. Usually within 200-300ms.
+4. **The transcript types itself in at the cursor** when you release.
 
 That's it. There is no record button, no stop button, no "send"  -  `fn` is the whole interface.
 
 > **Note:** on most modern Macs the `fn` key is the bottom-left key. If yours is set to "Change input source" or "Show emoji & symbols," `parrot setup` will tell you how to flip it back to plain `fn`.
 
 ## CLI
+
+The examples below use `parrot` as shorthand for
+`.build/release/parrot` when running from a source checkout.
 
 ```sh
 parrot                                 # run in the foreground (^C to quit)
@@ -77,13 +81,6 @@ Only `127.0.0.1`, `localhost`, and `::1` URLs are accepted; use
 uses bearer authentication, set `PARROT_SYRINX_API_KEY` in the environment.
 `PARROT_PARAKEET_API_KEY` remains supported for compatibility; do not place
 the token on the command line.
-
-The measured Apple Silicon Docker runtime reached health in about two seconds,
-used up to 1.47 GiB on short fixtures (reserve 2 GiB per worker), and had
-post-upload p95 latency of 309 ms for five-second clips and 397 ms for
-ten-second clips. This is CPU/ONNX Runtime inference, not WhisperKit's
-CoreML/ANE path. The runtime evidence does not establish a quality comparison
-with WhisperKit.
 
 The server is [Apache-2.0](https://github.com/achetronic/parakeet) and its
 converted NVIDIA Parakeet TDT 0.6B v3 ONNX model is

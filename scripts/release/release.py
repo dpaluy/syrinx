@@ -139,7 +139,7 @@ MANIFEST_DIGEST_PROCEDURE = "Serialize this JSON as UTF-8 with LF line endings, 
 MANIFEST_DIGEST_SELF_EXCLUSION = "The manifestContentDigest property is excluded before hashing to avoid a self-reference."
 SWIFT_RESOURCE_BUNDLE_NAME = "SYRINX_SyrinxCore.bundle"
 SWIFT_RESOURCE_MANIFEST_NAME = "parakeet-tdt-0.6b-v3-int8.json"
-DISABLED_SWIFTPM_FALLBACK = b"__T50B_SWIFTPM_RESOURCE_FALLBACK_DISABLED__"
+DISABLED_SWIFTPM_FALLBACK = b"__SYRINX_RESOURCE_FALLBACK_DISABLED__"
 
 
 class ReleaseError(RuntimeError):
@@ -1762,13 +1762,13 @@ def make_release_metadata(args: argparse.Namespace, inputs: Dict[str, Any], mani
                 "serviceLabel": args.service_label,
             },
         },
-        "t50cRuntime": {
+        "runtimeLifecycle": {
             "sourcePayloadRoot": relative_root,
-            "materialization": "T50C copies the immutable versioned payload into its per-user service version store",
-            "selection": "T50C lifecycle owns per-user version selection and rollback",
+            "materialization": "The service copies the immutable payload into its per-user version store",
+            "selection": "The service lifecycle owns per-user version selection and rollback",
             "dataRootRelativeVersionPath": "service/versions/{version}",
             "selectionRecord": "service/selection.json",
-            "selectionRecordOwner": "T50C lifecycle",
+            "selectionRecordOwner": "service lifecycle",
             "selectionField": "activeVersion",
         },
         "modelManifest": {"path": "metadata/model-manifest.json", "sha256": manifest_digest},
@@ -2409,7 +2409,7 @@ def write_spdx(args: argparse.Namespace, inputs: Dict[str, Any], payload_root: P
         "SPDXID": "SPDXRef-DOCUMENT",
         "name": "%s-%s-sbom" % (args.product_identity, args.version),
         "documentNamespace": "%s/releases/%s/%s" % (args.repository_url, args.tag, args.source_commit),
-        "creationInfo": {"created": "1970-01-01T00:00:00Z", "creators": ["Tool: native-parakeet-release-tooling"]},
+        "creationInfo": {"created": "1970-01-01T00:00:00Z", "creators": ["Tool: trusted-release-tooling"]},
         "packages": packages,
         "files": files,
         "relationships": relationships,
