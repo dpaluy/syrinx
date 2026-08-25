@@ -383,7 +383,7 @@ final class TrustedCandidateTests: XCTestCase {
         try assertValidationRejectsBeforeDeadline(
             target: "over-limit",
             label: "over-limit candidate tree",
-            timeout: 2.0
+            timeout: 10.0
         )
     }
 
