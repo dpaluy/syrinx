@@ -26,10 +26,15 @@ final class ServiceLifecycleLockTests: XCTestCase {
             helper.waitUntilExit()
         }
 
-        for _ in 0..<50 where !FileManager.default.fileExists(atPath: ready.path) {
+        let readinessDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !FileManager.default.fileExists(atPath: ready.path),
+              ContinuousClock.now < readinessDeadline {
             try await Task.sleep(for: .milliseconds(10))
         }
-        XCTAssertTrue(FileManager.default.fileExists(atPath: ready.path))
+        guard FileManager.default.fileExists(atPath: ready.path) else {
+            XCTFail("cross-process lock helper did not become ready")
+            return
+        }
         let lock = ServiceLifecycleLock(path: path, fileSystem: ServiceFileSystem(), timeout: .milliseconds(50))
         do {
             _ = try await lock.withLock { 1 }
