@@ -192,14 +192,17 @@ final class ServiceFileSystemSecurityTests: XCTestCase {
         try ServiceFileSystem().writePrivateFileAtomically(original, to: log)
 
         let writerStarted = DispatchSemaphore(value: 0)
+        let writerAttempted = DispatchSemaphore(value: 0)
         let writerFinished = DispatchSemaphore(value: 0)
         let writer = ServiceLogWriter(paths: [log], limit: 4 * 1024)
         let fileSystem = ServiceFileSystem(afterOpeningPrivateRead: { _, _ in
             DispatchQueue.global().async {
+                writerAttempted.signal()
                 try? writer.append("concurrent record")
                 writerFinished.signal()
             }
             writerStarted.signal()
+            _ = writerAttempted.wait(timeout: .now() + .seconds(2))
             usleep(100_000)
         })
 
