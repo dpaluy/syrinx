@@ -6,7 +6,7 @@ on:
 
 jobs:
   native:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       # Reviewed v4 tag, pinned to immutable commit 11d5960a326750d5838078e36cf38b85af677262.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -20,7 +20,7 @@ jobs:
         run: "! rg -n '\\x{2014}' --hidden --glob '!.git/**' --glob '!.build/**' --glob '!**/.build/**' --glob '!scripts/clean-source-audit.sh' ."
 
   parrot:
-    runs-on: macos-14
+    runs-on: macos-15
     defaults:
       run:
         working-directory: parrot

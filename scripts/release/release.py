@@ -3520,8 +3520,8 @@ def validate_workflow(path: Path) -> None:
             fail("workflow action is not pinned to a full commit SHA: %s" % value)
     if "actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2" not in uses:
         fail("workflow must pin attest-build-provenance to the reviewed commit")
-    if "runs-on: macos-14" not in text:
-        fail("workflow must use the reviewed macos-14 Apple Silicon label")
+    if "runs-on: macos-15" not in text:
+        fail("workflow must use the reviewed macos-15 Apple Silicon label")
     if "uname -m" not in text or "arm64" not in text:
         fail("workflow must enforce arm64")
     forbidden_dispatch_source = "RELEASE_SOURCE_COMMIT: ${{ github." + "sha }}"
@@ -3596,7 +3596,7 @@ def validate_workflow(path: Path) -> None:
         fail("build and verify jobs must not have contents write permission")
     if "set -x" in text or "echo ${{ secrets" in text:
         fail("workflow may expose secrets")
-    print(json.dumps({"workflow": str(path), "pinnedActions": len(uses), "runner": "macos-14", "architecture": "arm64"}, sort_keys=True))
+    print(json.dumps({"workflow": str(path), "pinnedActions": len(uses), "runner": "macos-15", "architecture": "arm64"}, sort_keys=True))
 
 
 def publish_release(args: argparse.Namespace) -> None:
