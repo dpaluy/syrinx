@@ -5,9 +5,9 @@ release in local tests.
 
 ## Protected runner
 
-The workflow uses the exact GitHub-hosted `macos-15` label. The macOS 15
-Apple Silicon image provides Xcode 16 and the Swift 6 toolchain required by
-both Swift packages.
+The workflow uses the exact GitHub-hosted `macos-26` label. The macOS 26
+Apple Silicon image provides the current Xcode and Swift 6 toolchain required
+by both Swift packages.
 The workflow still checks `uname -m` for `arm64` and requires macOS 14 or
 later before Swift or signing work starts.
 
@@ -16,10 +16,10 @@ Evidence sources:
 - [GitHub supported runners table](https://github.com/github/docs/blob/main/data/reusables/actions/supported-github-runners.md), current Arm64 row and labels.
 - [GitHub-hosted runners reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), including Arm64 macOS limitations.
 - [Raw GitHub runner table](https://raw.githubusercontent.com/github/docs/main/data/reusables/actions/supported-github-runners.md), fetched and checked on 2026-08-15.
-- [macOS 15 Arm64 runner image](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md).
+- [macOS 26 Arm64 runner image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md).
 
 Before a real release, recheck the table and move to the current documented
-Arm64 label if `macos-15` is removed. Do not replace it with an unverified
+Arm64 label if `macos-26` is removed. Do not replace it with an unverified
 label. A protected self-hosted label set such as `self-hosted`, `macOS`,
 `ARM64`, `release` is an approved fallback only after the repository
 administrators register and protect that runner group.
