@@ -11,8 +11,8 @@ jobs:
   native:
     runs-on: macos-26
     steps:
-      # Reviewed v4 tag, pinned to immutable commit 11d5960a326750d5838078e36cf38b85af677262.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout v7.0.1, reviewed immutable commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Clean source audit
         run: ./scripts/clean-source-audit.sh
       - name: Validate release workflow
@@ -28,7 +28,7 @@ jobs:
       run:
         working-directory: parrot
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build
         run: swift build
       - name: Test

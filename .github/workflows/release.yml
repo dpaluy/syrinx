@@ -53,8 +53,8 @@ jobs:
       RELEASE_SUPPORT: SUPPORT.md
       RELEASE_CHANGELOG: CHANGELOG.md
     steps:
-      # actions/checkout v4, reviewed immutable commit.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout v7.0.1, reviewed immutable commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
@@ -136,8 +136,8 @@ jobs:
       RELEASE_SUPPORT: SUPPORT.md
       RELEASE_CHANGELOG: CHANGELOG.md
     steps:
-      # actions/checkout v4, reviewed immutable commit.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout v7.0.1, reviewed immutable commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
@@ -243,8 +243,8 @@ jobs:
       RELEASE_SUPPORT: SUPPORT.md
       RELEASE_CHANGELOG: CHANGELOG.md
     steps:
-      # actions/checkout v4, reviewed immutable commit.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout v7.0.1, reviewed immutable commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
