@@ -31,7 +31,6 @@ jobs:
       artifact-digest: ${{ steps.upload-build.outputs.artifact-digest }}
     env:
       RELEASE_REPO_ROOT: ${{ github.workspace }}
-      RELEASE_OUTPUT_DIR: ${{ runner.temp }}/trusted-release-build-input
       RELEASE_PRODUCT_IDENTITY: ${{ vars.RELEASE_PRODUCT_IDENTITY }}
       RELEASE_EXECUTABLE: ${{ vars.RELEASE_EXECUTABLE }}
       RELEASE_PACKAGE_ID: ${{ vars.RELEASE_PACKAGE_ID }}
@@ -60,6 +59,9 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Set runner-local release paths
+        run: echo "RELEASE_OUTPUT_DIR=$RUNNER_TEMP/trusted-release-build-input" >> "$GITHUB_ENV"
 
       - name: Enforce protected Apple Silicon runner
         run: |
@@ -111,14 +113,8 @@ jobs:
       actions: read
     env:
       RELEASE_REPO_ROOT: ${{ github.workspace }}
-      RELEASE_OUTPUT_DIR: ${{ runner.temp }}/trusted-release-snapshot
       RELEASE_BUILD_ARTIFACT_ID: ${{ needs.build-verify.outputs.artifact-id }}
       RELEASE_BUILD_ARTIFACT_DIGEST: ${{ needs.build-verify.outputs.artifact-digest }}
-      RELEASE_BUILD_ARCHIVE: ${{ runner.temp }}/trusted-release-build-input.zip
-      RELEASE_BUILD_EXTRACTED_DIR: ${{ runner.temp }}/trusted-release-extracted
-      RELEASE_BUILD_SNAPSHOT_DIR: ${{ runner.temp }}/trusted-release-snapshot
-      RELEASE_BUILD_HANDOFF_STATE: ${{ runner.temp }}/trusted-release-build-handoff.json
-      RELEASE_BUILD_SNAPSHOT_STATE: ${{ runner.temp }}/trusted-release-build-snapshot.json
       RELEASE_PRODUCT_IDENTITY: ${{ vars.RELEASE_PRODUCT_IDENTITY }}
       RELEASE_EXECUTABLE: ${{ vars.RELEASE_EXECUTABLE }}
       RELEASE_PACKAGE_ID: ${{ vars.RELEASE_PACKAGE_ID }}
@@ -139,14 +135,6 @@ jobs:
       RELEASE_COMPATIBILITY: COMPATIBILITY.md
       RELEASE_SUPPORT: SUPPORT.md
       RELEASE_CHANGELOG: CHANGELOG.md
-      RELEASE_SIGNING_STATE: ${{ runner.temp }}/trusted-release-signing-state.json
-      RELEASE_SIGNING_KEYCHAIN: ${{ runner.temp }}/trusted-release-signing.keychain-db
-      RELEASE_TRUSTED_SIGNING_KEYCHAIN: ${{ runner.temp }}/trusted-release-signing.keychain-db
-      RELEASE_SIGNING_CLEANUP_PLAN: ${{ runner.temp }}/trusted-release-signing-cleanup-plan.json
-      RELEASE_APPLICATION_CERTIFICATE_PATH: ${{ runner.temp }}/trusted-release-application.p12
-      RELEASE_INSTALLER_CERTIFICATE_PATH: ${{ runner.temp }}/trusted-release-installer.p12
-      RELEASE_SIGNATURE_PRIVATE_KEY_PATH: ${{ runner.temp }}/trusted-release-signature-private.pem
-      RELEASE_SIGNATURE_PUBLIC_KEY_PATH: ${{ runner.temp }}/trusted-release-signature-public.pem
     steps:
       # actions/checkout v4, reviewed immutable commit.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -154,6 +142,25 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Set runner-local release paths
+        run: |
+          {
+            echo "RELEASE_OUTPUT_DIR=$RUNNER_TEMP/trusted-release-snapshot"
+            echo "RELEASE_BUILD_ARCHIVE=$RUNNER_TEMP/trusted-release-build-input.zip"
+            echo "RELEASE_BUILD_EXTRACTED_DIR=$RUNNER_TEMP/trusted-release-extracted"
+            echo "RELEASE_BUILD_SNAPSHOT_DIR=$RUNNER_TEMP/trusted-release-snapshot"
+            echo "RELEASE_BUILD_HANDOFF_STATE=$RUNNER_TEMP/trusted-release-build-handoff.json"
+            echo "RELEASE_BUILD_SNAPSHOT_STATE=$RUNNER_TEMP/trusted-release-build-snapshot.json"
+            echo "RELEASE_SIGNING_STATE=$RUNNER_TEMP/trusted-release-signing-state.json"
+            echo "RELEASE_SIGNING_KEYCHAIN=$RUNNER_TEMP/trusted-release-signing.keychain-db"
+            echo "RELEASE_TRUSTED_SIGNING_KEYCHAIN=$RUNNER_TEMP/trusted-release-signing.keychain-db"
+            echo "RELEASE_SIGNING_CLEANUP_PLAN=$RUNNER_TEMP/trusted-release-signing-cleanup-plan.json"
+            echo "RELEASE_APPLICATION_CERTIFICATE_PATH=$RUNNER_TEMP/trusted-release-application.p12"
+            echo "RELEASE_INSTALLER_CERTIFICATE_PATH=$RUNNER_TEMP/trusted-release-installer.p12"
+            echo "RELEASE_SIGNATURE_PRIVATE_KEY_PATH=$RUNNER_TEMP/trusted-release-signature-private.pem"
+            echo "RELEASE_SIGNATURE_PUBLIC_KEY_PATH=$RUNNER_TEMP/trusted-release-signature-public.pem"
+          } >> "$GITHUB_ENV"
 
       - name: Enforce protected Apple Silicon runner
         run: |
@@ -215,7 +222,6 @@ jobs:
       attestations: write
     env:
       RELEASE_REPO_ROOT: ${{ github.workspace }}
-      RELEASE_OUTPUT_DIR: ${{ runner.temp }}/trusted-release
       RELEASE_PRODUCT_IDENTITY: ${{ vars.RELEASE_PRODUCT_IDENTITY }}
       RELEASE_EXECUTABLE: ${{ vars.RELEASE_EXECUTABLE }}
       RELEASE_PACKAGE_ID: ${{ vars.RELEASE_PACKAGE_ID }}
@@ -236,8 +242,6 @@ jobs:
       RELEASE_COMPATIBILITY: COMPATIBILITY.md
       RELEASE_SUPPORT: SUPPORT.md
       RELEASE_CHANGELOG: CHANGELOG.md
-      RELEASE_SIGNING_STATE: ${{ runner.temp }}/trusted-release-verification-state.json
-      RELEASE_SIGNATURE_PUBLIC_KEY_PATH: ${{ runner.temp }}/trusted-release-signature-public.pem
     steps:
       # actions/checkout v4, reviewed immutable commit.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -245,6 +249,14 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Set runner-local release paths
+        run: |
+          {
+            echo "RELEASE_OUTPUT_DIR=$RUNNER_TEMP/trusted-release"
+            echo "RELEASE_SIGNING_STATE=$RUNNER_TEMP/trusted-release-verification-state.json"
+            echo "RELEASE_SIGNATURE_PUBLIC_KEY_PATH=$RUNNER_TEMP/trusted-release-signature-public.pem"
+          } >> "$GITHUB_ENV"
 
       - name: Enforce protected Apple Silicon runner
         run: |
