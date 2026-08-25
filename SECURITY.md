@@ -10,6 +10,9 @@ branch until the project publishes versioned releases.
 Use **Security > Report a vulnerability** in the GitHub repository. This sends
 the report through GitHub private vulnerability reporting.
 
+The publication procedure requires the repository owner to enable and verify
+this GitHub feature before announcing the public repository.
+
 Do not put a vulnerability, secret, personal data, audio file, model file, or
 private log in a public issue. Include the affected commit or version, impact,
 reproduction steps, and any suggested mitigation in the private report.
