@@ -1151,24 +1151,17 @@ private final class CandidateTreeInventory {
 }
 
 private struct DirectoryIdentity: Equatable {
+    // Parent directory timestamps and link counts change when unrelated temporary
+    // entries are created. The tree inventory checks candidate contents separately.
+    // These fields therefore track only replacement and permission changes.
     let device: UInt64
     let inode: UInt64
     let mode: UInt32
-    let linkCount: UInt64
-    let modificationSeconds: Int64
-    let modificationNanoseconds: Int64
-    let changeSeconds: Int64
-    let changeNanoseconds: Int64
 
     init(stat value: stat) {
         device = UInt64(value.st_dev)
         inode = UInt64(value.st_ino)
         mode = UInt32(value.st_mode)
-        linkCount = UInt64(value.st_nlink)
-        modificationSeconds = Int64(value.st_mtimespec.tv_sec)
-        modificationNanoseconds = Int64(value.st_mtimespec.tv_nsec)
-        changeSeconds = Int64(value.st_ctimespec.tv_sec)
-        changeNanoseconds = Int64(value.st_ctimespec.tv_nsec)
     }
 }
 
@@ -1176,6 +1169,7 @@ private struct HeldDirectory {
     let url: URL
     let descriptor: Int32
     let identity: DirectoryIdentity
+    let strictIdentity: CandidateNodeIdentity?
 }
 
 private final class PinnedDirectoryAuthority {
@@ -1325,10 +1319,12 @@ private final class PinnedDirectoryAuthority {
             var visibleInfo = stat()
             guard fstat(held.descriptor, &descriptorInfo) == 0,
                   lstat(held.url.path, &visibleInfo) == 0,
+                  (descriptorInfo.st_mode & S_IFMT) == S_IFDIR,
+                  (visibleInfo.st_mode & S_IFMT) == S_IFDIR,
                   DirectoryIdentity(stat: descriptorInfo) == held.identity,
                   DirectoryIdentity(stat: visibleInfo) == held.identity,
-                  (descriptorInfo.st_mode & S_IFMT) == S_IFDIR,
-                  (visibleInfo.st_mode & S_IFMT) == S_IFDIR
+                  (held.strictIdentity.map({ CandidateNodeIdentity(stat: descriptorInfo) == $0 }) ?? true),
+                  (held.strictIdentity.map({ CandidateNodeIdentity(stat: visibleInfo) == $0 }) ?? true)
             else {
                 throw TrustedCandidateError.unsafePath("directory authority changed")
             }
@@ -1578,8 +1574,14 @@ private final class PinnedDirectoryAuthority {
         guard (descriptorInfo.st_mode & writableMask) == 0 else {
             throw TrustedCandidateError.unsafePermissions(url.path)
         }
+        let strictIdentity = requireImmutable ? CandidateNodeIdentity(stat: descriptorInfo) : nil
         heldDirectories.append(
-            HeldDirectory(url: url, descriptor: descriptor, identity: DirectoryIdentity(stat: descriptorInfo))
+            HeldDirectory(
+                url: url,
+                descriptor: descriptor,
+                identity: DirectoryIdentity(stat: descriptorInfo),
+                strictIdentity: strictIdentity
+            )
         )
     }
 
