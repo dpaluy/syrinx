@@ -191,18 +191,22 @@ final class ServiceFileSystemSecurityTests: XCTestCase {
         let original = Data("prior record\n".utf8)
         try ServiceFileSystem().writePrivateFileAtomically(original, to: log)
 
-        let writerStarted = DispatchSemaphore(value: 0)
-        let writerAttempted = DispatchSemaphore(value: 0)
-        let writerFinished = DispatchSemaphore(value: 0)
-        let writer = ServiceLogWriter(paths: [log], limit: 4 * 1024)
+        let writerReady = root.appendingPathComponent("writer-ready")
+        let writerFinished = root.appendingPathComponent("writer-finished")
+        let writerWasBlocked = LockedTestBool()
+        let writer = try ExternalLogWriterProcess(
+            log: log,
+            ready: writerReady,
+            finished: writerFinished
+        )
+        defer { writer.stop() }
         let fileSystem = ServiceFileSystem(afterOpeningPrivateRead: { _, _ in
-            DispatchQueue.global().async {
-                writerAttempted.signal()
-                try? writer.append("concurrent record")
-                writerFinished.signal()
+            writer.start()
+            let deadline = Date().addingTimeInterval(2)
+            while !FileManager.default.fileExists(atPath: writerReady.path), Date() < deadline {
+                usleep(1_000)
             }
-            writerStarted.signal()
-            _ = writerAttempted.wait(timeout: .now() + .seconds(2))
+            writerWasBlocked.value = !FileManager.default.fileExists(atPath: writerFinished.path)
             usleep(100_000)
         })
 
@@ -210,11 +214,14 @@ final class ServiceFileSystemSecurityTests: XCTestCase {
             try fileSystem.snapshotPrivateLogFileIfPresent(log, limit: 4 * 1024)
         )
 
-        XCTAssertEqual(writerStarted.wait(timeout: .now()), .success)
-        XCTAssertEqual(writerFinished.wait(timeout: .now()), .timedOut)
+        XCTAssertTrue(writerWasBlocked.value)
         XCTAssertEqual(snapshot.data, original)
         XCTAssertEqual(snapshot.mode & 0o7777, 0o600)
-        XCTAssertEqual(writerFinished.wait(timeout: .now() + .seconds(2)), .success)
+        let deadline = Date().addingTimeInterval(2)
+        while !FileManager.default.fileExists(atPath: writerFinished.path), Date() < deadline {
+            usleep(1_000)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: writerFinished.path))
         XCTAssertTrue(try String(contentsOf: log, encoding: .utf8).contains("concurrent record\n"))
     }
 
@@ -484,6 +491,40 @@ final class ServiceFileSystemSecurityTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         chmod(root.path, mode_t(0o700))
         return root
+    }
+}
+
+private final class ExternalLogWriterProcess: @unchecked Sendable {
+    private let process: Process
+
+    init(log: URL, ready: URL, finished: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        process.arguments = [
+            "-MFcntl=:flock",
+            "-e",
+            "open(my $f, '>>', $ARGV[0]) or die; open(my $r, '>', $ARGV[1]) or die; close($r); flock($f, LOCK_EX) or die; print $f \"concurrent record\\n\"; close($f); open(my $d, '>', $ARGV[2]) or die; close($d);",
+            log.path,
+            ready.path,
+            finished.path
+        ]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        self.process = process
+    }
+
+    func start() {
+        guard !process.isRunning else { return }
+        try? process.run()
+    }
+
+    func stop() {
+        if process.isRunning {
+            process.terminate()
+        }
+        if process.processIdentifier != 0 {
+            process.waitUntilExit()
+        }
     }
 }
 
