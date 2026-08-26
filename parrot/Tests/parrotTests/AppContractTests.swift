@@ -99,4 +99,31 @@ final class AppContractTests: XCTestCase {
             .cancel
         )
     }
+
+    func testPermissionGrantWaiterPollsUntilAccessIsGranted() async {
+        var checks = 0
+        var waits = 0
+
+        let granted = await SyrinxPermissionGrantWaiter.waitUntilGranted {
+            checks += 1
+            return checks == 3
+        } waitForNextCheck: {
+            waits += 1
+            return true
+        }
+
+        XCTAssertTrue(granted)
+        XCTAssertEqual(checks, 3)
+        XCTAssertEqual(waits, 2)
+    }
+
+    func testPermissionGrantWaiterStopsWhenPollingIsCancelled() async {
+        let granted = await SyrinxPermissionGrantWaiter.waitUntilGranted {
+            false
+        } waitForNextCheck: {
+            false
+        }
+
+        XCTAssertFalse(granted)
+    }
 }

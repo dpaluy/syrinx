@@ -127,17 +127,7 @@ private enum PermissionFlow {
                 )
                 switch followUp {
                 case .openSettings(let pane):
-                    guard waitForSettings(anchor: settingsAnchor(for: pane)) else {
-                        return false
-                    }
-                    let recheck = SyrinxPermissionFlow.next(
-                        microphoneGranted: microphoneGranted,
-                        accessibilityGranted: accessibilityGranted,
-                        accessibilityRequested: accessibilityRequested,
-                        microphoneRequested: microphoneRequested,
-                        userAction: .checkAgain
-                    )
-                    guard recheck == .recheck else {
+                    guard await waitForPermissionGrant(pane: pane) else {
                         return false
                     }
                 case .recheck:
@@ -205,30 +195,31 @@ private enum PermissionFlow {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Syrinx needs " + missing + " access"
-        alert.informativeText = "Enable Syrinx under " + missing + " in System Settings > Privacy & Security. Return to Syrinx and choose Check Again after you grant access."
+        alert.informativeText = "Enable Syrinx under " + missing + " in System Settings > Privacy & Security. Syrinx checks again automatically."
         alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Check Again")
         alert.addButton(withTitle: "Cancel")
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            return .openSettings
-        case .alertSecondButtonReturn:
-            return .checkAgain
-        default:
-            return .cancel
-        }
+        return alert.runModal() == .alertFirstButtonReturn ? .openSettings : .cancel
     }
 
-    private static func waitForSettings(anchor: String) -> Bool {
-        openSettings(anchor: anchor)
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Return to Syrinx when access is enabled"
-        alert.informativeText = "Choose Check Again after you enable the requested access. Choose Cancel to leave Syrinx waiting for permissions."
-        alert.addButton(withTitle: "Check Again")
-        alert.addButton(withTitle: "Cancel")
-        return alert.runModal() == .alertFirstButtonReturn
+    private static func waitForPermissionGrant(pane: SyrinxPermissionPane) async -> Bool {
+        guard openSettings(anchor: settingsAnchor(for: pane)) else {
+            return false
+        }
+        return await SyrinxPermissionGrantWaiter.waitUntilGranted {
+            switch pane {
+            case .microphone:
+                return microphoneIsGranted()
+            case .accessibility:
+                return requestAccessibilityIfNeeded(prompt: false)
+            }
+        } waitForNextCheck: {
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+                return true
+            } catch {
+                return false
+            }
+        }
     }
 
     private static func settingsAnchor(for pane: SyrinxPermissionPane) -> String {
@@ -240,10 +231,10 @@ private enum PermissionFlow {
         }
     }
 
-    private static func openSettings(anchor: String) {
+    private static func openSettings(anchor: String) -> Bool {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + anchor) else {
-            return
+            return false
         }
-        NSWorkspace.shared.open(url)
+        return NSWorkspace.shared.open(url)
     }
 }

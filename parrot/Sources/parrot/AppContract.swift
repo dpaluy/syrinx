@@ -82,3 +82,17 @@ public enum SyrinxPermissionFlow {
         accessibilityGranted ? .microphone : .accessibility
     }
 }
+
+public enum SyrinxPermissionGrantWaiter {
+    public static func waitUntilGranted(
+        isGranted: () -> Bool,
+        waitForNextCheck: () async -> Bool
+    ) async -> Bool {
+        while !isGranted() {
+            guard await waitForNextCheck() else {
+                return false
+            }
+        }
+        return true
+    }
+}

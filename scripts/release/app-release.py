@@ -27,6 +27,7 @@ MINIMUM_MACOS = "14.0"
 INFO_PLIST_SOURCE = Path("parrot/Resources/SyrinxApp/Info.plist")
 APP_ICON_FILE = "AppIcon.icns"
 APP_ICON_SOURCE = Path("parrot/Resources/SyrinxApp") / APP_ICON_FILE
+APP_ENTITLEMENTS_SOURCE = Path("parrot/Resources/SyrinxApp/Syrinx.entitlements")
 OUTPUT_NAMES = (
     "{product}-{version}.zip",
     "{product}-{version}.metadata.json",
@@ -80,6 +81,28 @@ def run_tool(argv: list[str], cwd: Optional[Path] = None, timeout: int = 20 * 60
     return result.stdout
 
 
+def run_tool_combined(argv: list[str], cwd: Optional[Path] = None, timeout: int = 20 * 60) -> str:
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=str(cwd) if cwd else None,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        fail("could not run %s: %s" % (argv[0], error))
+    if result.returncode != 0:
+        detail = result.stdout.strip().splitlines()
+        fail("%s failed%s" % (argv[0], ": " + detail[-1][:400] if detail else ""))
+    if len(result.stdout) > MAX_TOOL_OUTPUT:
+        fail("%s produced output over the configured bound" % argv[0])
+    return result.stdout
+
+
 def env_or(name: str, default: Optional[str] = None) -> Optional[str]:
     return os.environ.get(name) or default
 
@@ -117,6 +140,43 @@ def validate_source(args: argparse.Namespace) -> None:
         fail("annotated tag does not target the declared source commit")
     require_path(repo / INFO_PLIST_SOURCE, "Syrinx Info.plist")
     require_path(repo / APP_ICON_SOURCE, "Syrinx app icon")
+    load_app_entitlements(repo)
+
+
+def load_app_entitlements(repo_root: Path) -> Path:
+    source = require_path(repo_root / APP_ENTITLEMENTS_SOURCE, "Syrinx signing entitlements")
+    try:
+        with source.open("rb") as handle:
+            entitlements = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException, ValueError) as error:
+        fail("Syrinx signing entitlements are invalid: %s" % error)
+    if entitlements != {"com.apple.security.device.audio-input": True}:
+        fail("Syrinx signing entitlements must enable only audio input")
+    return source
+
+
+def signed_entitlements(app: Path) -> Dict[str, Any]:
+    output = run_tool_combined([
+        "codesign", "--display", "--entitlements", ":-", str(app),
+    ])
+    start = output.find("<?xml")
+    if start < 0:
+        start = output.find("<plist")
+    end = output.find("</plist>", start)
+    if start < 0 or end < 0:
+        fail("signed app does not contain readable entitlements")
+    try:
+        value = plistlib.loads(output[start:end + len("</plist>")].encode("utf-8"))
+    except (plistlib.InvalidFileException, ValueError) as error:
+        fail("signed app entitlements are invalid: %s" % error)
+    if not isinstance(value, dict):
+        fail("signed app entitlements are not a dictionary")
+    return value
+
+
+def validate_signed_entitlements(app: Path) -> None:
+    if signed_entitlements(app).get("com.apple.security.device.audio-input") is not True:
+        fail("signed app is missing the audio input entitlement")
 
 
 def safe_relative(path: Path) -> str:
@@ -265,6 +325,7 @@ def sign_app(args: argparse.Namespace, app: Path) -> None:
         fail("Apple signing requires macOS")
     if not args.application_identity:
         fail("signed app requires RELEASE_APPLICATION_IDENTITY")
+    entitlements = load_app_entitlements(args.repo_root)
     for path in sorted(app.rglob("*"), key=lambda item: (len(item.parts), item.as_posix()), reverse=True):
         if path.is_file() and path.suffix == ".dylib":
             run_tool([
@@ -273,9 +334,11 @@ def sign_app(args: argparse.Namespace, app: Path) -> None:
             ])
     run_tool([
         "codesign", "--force", "--options", "runtime", "--timestamp",
+        "--entitlements", str(entitlements),
         "--sign", args.application_identity, *signing_keychain_args(args), str(app),
     ])
     run_tool(["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app)])
+    validate_signed_entitlements(app)
     display = run_tool(["codesign", "--display", "--verbose=4", str(app)])
     if args.team_id and ("TeamIdentifier=" + args.team_id) not in display:
         fail("app signature Team ID does not match RELEASE_TEAM_ID")
@@ -494,6 +557,7 @@ def verify_output(args: argparse.Namespace, signed: bool) -> None:
             fail("app version does not match the release version")
         if signed:
             run_tool(["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app)])
+            validate_signed_entitlements(app)
     lines = (output / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
     names = set()
     for line in lines:
