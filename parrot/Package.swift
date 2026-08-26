@@ -11,7 +11,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.18.0"),
     ],
     targets: [
         .target(
@@ -20,7 +20,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "WhisperKit", package: "WhisperKit"),
             ],
-            path: "Sources/parrot"
+            path: "Sources/parrot",
+            linkerSettings: [
+                .linkedFramework("ServiceManagement"),
+            ]
         ),
         .executableTarget(
             name: "ParrotCLI",
