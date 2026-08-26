@@ -1,93 +1,57 @@
-# Parrot architecture
+# Syrinx client architecture
 
-Parrot is a macOS push-to-talk client. It records only while the configured
-hotkey is held, transcribes the completed recording, and inserts the result at
-the active text cursor.
+The end-user executable is the `syrinx` target, packaged as `Syrinx.app`.
+`ParrotCLI` is a development-only executable target. Both use the shared
+`SyrinxClient` library.
 
 ## Runtime flow
 
 ```text
-HotkeyMonitor
-      |
-      v
-AudioCapture --> Transcriber --> TextInjector
-                      |
-                      +--> WhisperKitTranscriber, in-process Core ML
-                      |
-                      +--> ParakeetTranscriber
-                                  |
-                                  +--> ParakeetHTTPAdapter, loopback HTTP
-
-RecordingOverlay and MenuBarController show the current state.
+Syrinx.app
+   |
+   +--> first-run permission guidance
+   |
+   +--> HotkeyMonitor --> AudioCapture --> WhisperKitTranscriber --> TextInjector
+   |                         |                    |
+   |                         +--> RecordingOverlay
+   |                         +--> MenuBarController
+   |
+   +--> local UserDefaults and WhisperKit model files
 ```
 
-1. `HotkeyMonitor` emits pressed and released events for the selected key.
-2. `AudioCapture` records 16 kHz mono samples while the key is held.
-3. The selected `Transcriber` converts the completed sample buffer to text.
-4. `TextInjector` inserts the sanitized transcript at the active cursor.
-5. The overlay and menu-bar item report recording and transcription state.
+1. The app explains Microphone and Accessibility access and asks the user to
+   set Fn or Globe to Do Nothing.
+2. `HotkeyMonitor` observes Fn press and release after Accessibility access is
+   granted.
+3. `AudioCapture` records 16 kHz mono samples only while Fn is held.
+4. `WhisperKitTranscriber` loads the local Whisper model and transcribes the
+   completed sample buffer in process.
+5. `TextInjector` inserts the sanitized result at the active cursor.
+6. The overlay and menu bar item show recording and transcription state.
 
-Parrot does not keep a transcript history or send audio to a cloud service.
+The app does not request Full Disk Access, Screen Recording, Input Monitoring,
+or Automation. It does not start a child model service or send audio to a
+network endpoint.
 
-## Commands
+## Development-only components
 
-`Parrot.swift` defines the command-line interface:
-
-- `parrot run` starts the dictation process;
-- `parrot setup` requests and explains required permissions;
-- `parrot doctor` checks microphone, Accessibility, and Fn-key state;
-- `parrot models` lists or downloads supported model configurations;
-- `parrot install` manages the launch-at-login LaunchAgent.
-
-## Transcription engines
-
-### WhisperKit
-
-`WhisperKitTranscriber` loads an in-process Core ML model. The recommended
-model is Whisper Base English. WhisperKit downloads the selected model when it
-is not already present.
-
-### Parakeet
-
-`ParakeetTranscriber` delegates service access to `ParakeetHTTPAdapter`. The
-adapter accepts only loopback URLs, checks service health, sends an in-memory
-WAV multipart request, and decodes the response. Syrinx is the supported native
-service. A compatible user-managed loopback service can also be used.
-
-Authentication tokens come from `PARROT_SYRINX_API_KEY` or the compatibility
-variable `PARROT_PARAKEET_API_KEY`. Tokens are not accepted as command-line
-arguments.
-
-## macOS integration
-
-Parrot uses:
-
-- `CGEventTap` for the global push-to-talk hotkey;
-- `AVAudioEngine` for microphone capture;
-- `CGEventKeyboardSetUnicodeString` for text insertion;
-- a borderless, click-through `NSWindow` for recording state;
-- an accessory `NSApplication` and menu-bar controller for process state.
-
-Microphone and Accessibility permissions belong to the terminal or process
-that launches Parrot. A launch-at-login installation can require a separate
-permission grant because macOS identifies it differently from an interactive
-terminal process.
+The package retains the Parakeet loopback adapter and the `parrot` CLI for
+development and integration tests. The optional native service and Docker
+commands belong to the root package. None of these components are used by the
+`syrinx` app target or included in its first-run instructions.
 
 ## Source layout
 
 ```text
 Sources/parrot/
-  Adapters/          Loopback service contract
-  Audio/             Capture and WAV encoding
-  Input/             Hotkey and text insertion
-  Models/            Supported transcription models
-  Transcription/     Engine protocol and implementations
-  UI/                Overlay and menu-bar state
-  Doctor.swift       Environment checks
-  Install.swift      LaunchAgent management
-  Parrot.swift       Command-line interface and runtime composition
-  Setup.swift        Permission setup
+  Audio/             Microphone capture and WAV test helpers
+  Input/             Fn monitor and cursor text injection
+  Models/            Whisper model registry
+  Transcription/     In-process WhisperKit path and dev adapters
+  UI/                Overlay and menu bar state
+  AppContract.swift  Product identity and permission copy
+  DictationSession.swift
+Sources/SyrinxApp/   App entry point and permission flow
+Sources/ParrotCLI/   Development CLI entry point
+Resources/SyrinxApp/Info.plist
 ```
-
-The package is separate from the root Syrinx package so WhisperKit and the
-native service keep independent dependency graphs.

@@ -1,0 +1,3 @@
+import SyrinxClient
+
+ParrotCommand.main()

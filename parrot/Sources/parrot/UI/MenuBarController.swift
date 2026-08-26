@@ -4,20 +4,20 @@ import AppKit
 /// a glance and provides the only persistent control surface for the daemon
 /// (since we run as `.accessory`  -  no dock icon, no main window).
 @MainActor
-final class MenuBarController {
+public final class MenuBarController {
     private let statusItem: NSStatusItem
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
     private let modelID: String
 
-    init(modelID: String) {
+    public init(modelID: String) {
         self.modelID = modelID
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        stateLabel = NSMenuItem(title: "idle · hold fn to dictate", action: nil, keyEquivalent: "")
+        stateLabel = NSMenuItem(title: "ready · hold Fn to dictate", action: nil, keyEquivalent: "")
         stateLabel.isEnabled = false
         menu.addItem(stateLabel)
 
@@ -28,7 +28,7 @@ final class MenuBarController {
         menu.addItem(.separator())
 
         let quit = NSMenuItem(
-            title: "Quit parrot",
+            title: "Quit Syrinx",
             action: #selector(quitClicked),
             keyEquivalent: "q"
         )
@@ -39,12 +39,16 @@ final class MenuBarController {
         configureButton(recording: false)
     }
 
-    func setRecording(_ recording: Bool) {
-        stateLabel.title = recording ? "● recording" : "idle · hold fn to dictate"
+    public func setRecording(_ recording: Bool) {
+        stateLabel.title = recording ? "● recording" : "ready · hold Fn to dictate"
     }
 
-    func setTranscribing() {
+    public func setTranscribing() {
         stateLabel.title = "transcribing…"
+    }
+
+    public func setStatus(_ status: String) {
+        stateLabel.title = status
     }
 
     private func configureButton(recording: Bool) {

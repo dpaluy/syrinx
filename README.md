@@ -1,31 +1,41 @@
 # Syrinx
 
-Syrinx is a private, local speech-to-text application for macOS. Hold the Fn
-key, speak, and release it. Syrinx inserts the transcript at the active cursor.
-Audio and transcription stay on the Mac.
+Syrinx is a macOS menu bar application for private, local speech-to-text.
+Hold Fn, speak, and release Fn. Syrinx inserts the transcript at the active
+cursor.
+
+Audio and transcription stay on the Mac. Syrinx does not use cloud
+transcription.
 
 ## Project status
 
 Syrinx is pre-release software. A signed and notarized Mac application is not
-available yet. When the first release is published, the Quick Start below will
-be the supported installation path.
+available until the signing, notarization, and clean-machine gates pass. The
+release workflow publishes `Syrinx.app` only when those gates pass. The native
+Parakeet service is a development and integration component. It is not part of
+the end-user application.
 
 ## Requirements
 
 - Apple Silicon Mac
 - macOS 14 or later
+- No developer tools are required for end users.
 - Internet access for the first Whisper model download
 
 ## Quick start
 
-1. Open the [latest Syrinx release](https://github.com/dpaluy/syrinx/releases/latest).
-2. Download and install the Mac application.
-3. Open Syrinx from the Applications folder.
-4. Approve the macOS permissions described below.
+1. Download `Syrinx-<version>.zip` from GitHub Releases.
+2. Open the archive and move `Syrinx.app` to Applications.
+3. Open Syrinx.app.
+4. On first launch, set the Fn or Globe key to **Do Nothing** in System
+   Settings > Keyboard. Grant Syrinx **Microphone** and **Accessibility**
+   access when macOS asks.
+5. Click into the text field where you want the transcript, hold Fn, speak,
+   and release Fn.
 
 The first launch downloads and loads the recommended Whisper Base English
-model. When Syrinx is ready, place the cursor in any text field. Hold Fn,
-speak, and release Fn.
+model. Syrinx runs as a menu bar application and has no Terminal command in
+the end-user flow.
 
 ## Required macOS permissions
 
@@ -36,13 +46,8 @@ Syrinx needs these permissions:
   the active cursor.
 
 Syrinx requests both permissions when you first open it. You can also enable
-them manually:
-
-1. Open **System Settings > Privacy & Security > Microphone** and enable
-   **Syrinx**.
-2. Open **System Settings > Privacy & Security > Accessibility** and enable
-   **Syrinx**.
-3. Quit and reopen Syrinx after you change Accessibility access.
+them manually in **System Settings > Privacy & Security**. Quit and reopen
+Syrinx after you change Accessibility access.
 
 Syrinx also requires this keyboard setting:
 
@@ -52,30 +57,12 @@ Syrinx also requires this keyboard setting:
 Syrinx does not require Full Disk Access, Screen Recording, Input Monitoring,
 or Automation permission.
 
-## Repository layout
-
-```text
-Sources/SyrinxCore/     Native service library
-Sources/syrinx/         Native service executable
-Tests/                  Native service tests
-parrot/Sources/         Push-to-talk client source
-parrot/Tests/           Push-to-talk client tests
-docs/                   Architecture and release documentation
-scripts/                Contributor and release verification tools
-Packaging/              Installer and package contracts
-```
-
-Syrinx and Parrot are separate Swift packages so each executable has an
-independent dependency graph.
-
 ## Development
 
-Development requires Xcode 16 or later, or matching Swift 6 command-line
-tools. The source tree contains a Parrot push-to-talk client and a Syrinx
-Parakeet transcription service. End users do not run these components or their
-scripts separately.
+The source checkout contains the reusable client package, the Syrinx.app
+target, and a development CLI. The CLI is not the end-user distribution.
 
-Build both packages:
+Build both development packages:
 
 ```sh
 swift build
@@ -90,12 +77,28 @@ Run the test suites and repository checks:
 ./scripts/release/validate-workflow.sh
 ```
 
+Build the client app and run its tests:
+
+```sh
+swift build --package-path parrot --product syrinx --configuration release
+swift test --package-path parrot
+```
+
+Build an unsigned local app archive:
+
+```sh
+./scripts/release/build-app.sh --swift-build --unsigned-dry-run \
+  --skip-source-validation
+```
+
+The local archive is unsigned and is not proof of Apple signing,
+notarization, publication, installation, or Gatekeeper acceptance.
+
 Real-model integration tests require separately managed model and audio
 fixtures. Tests that need those fixtures report a skip when they are absent.
 
-The native Parakeet service is only a development and integration component.
-It is not part of the end-user application workflow. Before installing its
-model, read the
+The root native Parakeet service is only a development and integration
+component. Before installing its model, read the
 [model license review](docs/model-license-review.md).
 
 ```sh
@@ -110,10 +113,26 @@ model, read the
 The service binds to `127.0.0.1:5092` by default and rejects non-loopback
 hosts. Model bytes are not stored in this repository or bundled in a release.
 
+## Repository layout
+
+```text
+Sources/SyrinxCore/     Development native service library
+Sources/syrinx/         Development native service executable
+Tests/                  Native service tests
+parrot/Sources/         Reusable dictation client and Syrinx.app source
+parrot/Tests/           Dictation client tests
+docs/                   Architecture and release documentation
+scripts/                Contributor and release verification tools
+Packaging/              Installer and package contracts
+```
+
+The client and native service are separate Swift packages so WhisperKit and
+the optional native service keep independent dependency graphs.
+
 ## Documentation
 
-- [Native service](docs/native-service.md)
-- [Parrot architecture](parrot/docs/architecture.md)
+- [Native service development notes](docs/native-service.md)
+- [Client architecture](parrot/docs/architecture.md)
 - [Compatibility](COMPATIBILITY.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)

@@ -1,4 +1,9 @@
-# Syrinx
+# Native service development notes
+
+This is a development and integration component. It is not included in the
+end-user `Syrinx.app` flow. End users download the app, grant its Microphone
+and Accessibility permissions, and dictate through the in-process WhisperKit
+path.
 
 Syrinx is a native macOS speech service for local Parakeet transcription.
 

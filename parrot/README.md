@@ -1,63 +1,69 @@
-# Parrot development component
+# Syrinx client development package
 
-Parrot is the push-to-talk client used by the Syrinx Mac application. It
-captures audio, uses in-process WhisperKit or the local Syrinx service, and
-inserts the transcript at the cursor. This package is for development. End
-users install and open the Syrinx application.
+This package contains the reusable push-to-talk client and the `Syrinx.app`
+executable target. End users download `Syrinx.app` from GitHub Releases. They
+do not run this package, its CLI, or a source build.
 
-## Development
+## Build and test
 
-Development requires Xcode 16 or later, or matching Swift 6 command-line
-tools. Run these commands from the `parrot` directory:
+Run these commands from this directory:
 
 ```sh
-swift build
+swift build --product syrinx --configuration release
 swift test
 ```
 
-Run the development executable:
+Build an unsigned distribution archive from the repository root:
 
 ```sh
-.build/debug/parrot setup
-.build/debug/parrot doctor
-.build/debug/parrot
+./scripts/release/build-app.sh --swift-build --unsigned-dry-run \
+  --skip-source-validation
 ```
 
-## How to use
+The archive is local test evidence only. It is not signed, notarized, or
+published.
 
-1. **Run it.** Either `parrot install --launch-at-login` (daemonized, runs forever, lives in the menu bar), or `parrot` in any terminal tab.
-2. **Click into the text field you want to dictate into**  -  Messages, the address bar, a Slack thread, anywhere a cursor blinks.
-3. **Hold the `fn` key, speak, release.** A small pill appears at the bottom of the screen while the mic is hot.
-4. **The transcript types itself in at the cursor** when you release.
+## App behavior
 
-That's it. There is no record button, no stop button, no "send"  -  `fn` is the whole interface.
+Syrinx runs as a menu bar-only application. On first launch it explains the
+required Microphone and Accessibility permissions and the required Fn or
+Globe key setting, Do Nothing. It downloads the recommended Whisper Base
+English model through WhisperKit and keeps audio and transcription in the
+process on the Mac.
 
-> **Note:** on most modern Macs the `fn` key is the bottom-left key. If yours is set to "Change input source" or "Show emoji & symbols," `parrot setup` will tell you how to flip it back to plain `fn`.
+After setup, click into any text field, hold Fn, speak, and release Fn. The
+transcript is inserted at the active cursor.
 
 ## Development CLI
 
-The examples below use `parrot` as shorthand for the development executable.
+The `parrot` executable remains for client tests and local diagnostics. It is
+not included in the end-user application flow:
 
 ```sh
-parrot                                 # run in the foreground (^C to quit)
+swift run parrot --help
+```
+
+The development executable can also be used for local client work:
+
+```sh
+parrot                                 # run in the foreground
 parrot setup                           # one-time permission setup
-parrot install --launch-at-login       # register a LaunchAgent (background daemon)
+parrot install --launch-at-login       # register a LaunchAgent
 parrot install --uninstall             # remove the LaunchAgent
-parrot doctor                          # check permissions + fn key setting
+parrot doctor                          # check permissions and Fn setting
 parrot models list                     # list available models
 parrot models download <id>            # pre-download a model
 parrot --model whisper-large-v3-turbo  # bigger, multilingual, slower first-run
-parrot run --model parakeet-tdt-0.6b-v3 --syrinx-url http://127.0.0.1:5092
 parrot --hotkey right-option           # change the push-to-talk key
-parrot --no-overlay                    # disable the bottom-of-screen pill
+parrot --no-overlay                    # disable the recording overlay
 ```
 
 ## Parakeet development integration
 
 This integration is not part of the end-user application workflow.
 `parakeet-tdt-0.6b-v3` uses a developer-managed local HTTP service. Parrot does
-not install the service or its model files. Syrinx is the supported native
-development service and keeps the model on the same Mac without Docker:
+not install the service or its model files. Before installing its model, read
+the [model license review](../docs/model-license-review.md).
 
 ```sh
 syrinx models install --activate
@@ -67,7 +73,8 @@ curl http://127.0.0.1:5092/health
 parrot run --model parakeet-tdt-0.6b-v3 --syrinx-url http://127.0.0.1:5092
 ```
 
-The compatible upstream Docker service remains available as an alternative:
+The compatible upstream Docker service remains available as a development
+alternative:
 
 ```sh
 docker run -d --rm --name parrot-parakeet -p 127.0.0.1:5092:5092 \
@@ -77,29 +84,37 @@ curl http://127.0.0.1:5092/health
 parrot run --model parakeet-tdt-0.6b-v3 --parakeet-url http://127.0.0.1:5092
 ```
 
-When finished, run `docker stop parrot-parakeet`; `--rm` removes the stopped
-container automatically.
+When finished, run `docker stop parrot-parakeet`. The container is removed by
+the `--rm` option.
 
-The health endpoint must return `{"status":"ok"}` before Parrot starts.
-Only `127.0.0.1`, `localhost`, and `::1` URLs are accepted; use
-`--parakeet-url` to select another port or loopback spelling. If the service
-uses bearer authentication, set `PARROT_SYRINX_API_KEY` in the environment.
-`PARROT_PARAKEET_API_KEY` remains supported for compatibility; do not place
-the token on the command line.
+The health endpoint must return `{"status":"ok"}` before Parrot starts. Only
+`127.0.0.1`, `localhost`, and `::1` URLs are accepted. If the service uses
+bearer authentication, set `PARROT_SYRINX_API_KEY` in the environment. Do not
+place the token on the command line.
 
 The server is [Apache-2.0](https://github.com/achetronic/parakeet) and its
 converted NVIDIA Parakeet TDT 0.6B v3 ONNX model is
 [CC-BY-4.0](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx).
 
+## Source layout
+
+```text
+Sources/parrot/       Shared client behavior
+Sources/SyrinxApp/    Syrinx.app entry point and permission flow
+Sources/ParrotCLI/    Development-only CLI entry point
+Resources/SyrinxApp/  App Info.plist
+Tests/parrotTests/    Client and app contract tests
+```
+
 ## Stack
 
-- **Swift**  -  single SPM executable target
-- **WhisperKit**  -  Whisper inference via CoreML, ANE-accelerated
-- **Parakeet service adapter**  -  optional loopback HTTP transcription
-- **AVAudioEngine**  -  mic capture
+- **Swift**  -  Swift Package Manager targets
+- **WhisperKit**  -  in-process local Whisper inference
+- **Parakeet service adapter**  -  optional loopback HTTP development path
+- **AVAudioEngine**  -  microphone capture
 - **CGEventTap**  -  global hotkey
-- **CGEvent**  -  text injection at cursor
-- **NSWindow** (borderless, click-through)  -  recording-indicator pill
+- **CGEvent**  -  text injection at the cursor
+- **NSWindow**  -  recording indicator overlay
 
-See [docs/architecture.md](docs/architecture.md) for design notes and the root
-README for the complete Syrinx project workflow.
+See [docs/architecture.md](docs/architecture.md) for design notes and the
+root README for the complete Syrinx project workflow.

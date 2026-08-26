@@ -3,9 +3,10 @@ import ArgumentParser
 import Foundation
 import WhisperKit
 
-@main
-struct Parrot: ParsableCommand {
-    static let configuration = CommandConfiguration(
+public struct ParrotCommand: ParsableCommand {
+    public init() {}
+
+    public static let configuration = CommandConfiguration(
         commandName: "parrot",
         abstract: "Minimal macOS dictation daemon. Hold Fn, speak, release.",
         subcommands: [Run.self, Setup.self, Doctor.self, Models.self, Install.self],

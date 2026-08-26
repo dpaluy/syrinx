@@ -1,4 +1,4 @@
-name: Trusted native release
+name: Syrinx app release
 
 on:
   push:
@@ -14,14 +14,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: trusted-release-${{ github.ref }}
+  group: syrinx-app-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build-verify:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    # macos-26 is the current Swift 6-capable Apple Silicon runner.
-    # https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md
     runs-on: macos-26
     timeout-minutes: 60
     permissions:
@@ -31,74 +29,52 @@ jobs:
       artifact-digest: ${{ steps.upload-build.outputs.artifact-digest }}
     env:
       RELEASE_REPO_ROOT: ${{ github.workspace }}
-      RELEASE_PRODUCT_IDENTITY: ${{ vars.RELEASE_PRODUCT_IDENTITY }}
-      RELEASE_EXECUTABLE: ${{ vars.RELEASE_EXECUTABLE }}
-      RELEASE_PACKAGE_ID: ${{ vars.RELEASE_PACKAGE_ID }}
-      RELEASE_SERVICE_LABEL: ${{ vars.RELEASE_SERVICE_LABEL }}
+      RELEASE_OUTPUT_DIR: ${{ runner.temp }}/syrinx-app-build-input
       RELEASE_VERSION: ${{ vars.RELEASE_VERSION }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      RELEASE_SOURCE_COMMIT: ''
       RELEASE_APPLICATION_IDENTITY: ${{ vars.RELEASE_APPLICATION_IDENTITY }}
-      RELEASE_INSTALLER_IDENTITY: ${{ vars.RELEASE_INSTALLER_IDENTITY }}
       RELEASE_TEAM_ID: ${{ vars.RELEASE_TEAM_ID }}
-      RELEASE_OWNER: ${{ vars.RELEASE_OWNER }}
-      RELEASE_SECURITY_CONTACT: ${{ vars.RELEASE_SECURITY_CONTACT }}
-      RELEASE_REPOSITORY_URL: ${{ vars.RELEASE_REPOSITORY_URL }}
-      RELEASE_SOURCE_LICENSE: LICENSE
-      RELEASE_NOTICES: THIRD_PARTY_NOTICES.md
-      RELEASE_LICENSES_DIR: LICENSES
-      RELEASE_MODEL_MANIFEST: ModelManifests/parakeet-tdt-0.6b-v3-int8.json
-      RELEASE_EMBEDDED_MODEL_MANIFEST: Sources/SyrinxCore/Resources/parakeet-tdt-0.6b-v3-int8.json
-      RELEASE_COMPATIBILITY: COMPATIBILITY.md
-      RELEASE_SUPPORT: SUPPORT.md
-      RELEASE_CHANGELOG: CHANGELOG.md
     steps:
-      # actions/checkout v7.0.1, reviewed immutable commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set runner-local release paths
-        run: echo "RELEASE_OUTPUT_DIR=$RUNNER_TEMP/trusted-release-build-input" >> "$GITHUB_ENV"
-
       - name: Enforce protected Apple Silicon runner
         run: |
           test "$(uname -m)" = "arm64"
           test "$(sw_vers -productVersion | /usr/bin/cut -d. -f1)" -ge 14
 
-      - name: Resolve checked-out annotated tag target
-        run: python3 scripts/release/release.py resolve-source
+      - name: Resolve checked-out source commit
+        run: echo "RELEASE_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Validate exact source and release inputs
-        run: python3 scripts/release/release.py validate-source
+      - name: Validate app source and release inputs
+        run: python3 scripts/release/app-release.py validate-source
 
-      - name: Resolve and lock Swift dependencies
-        run: |
-          before="$(shasum -a 256 Package.resolved | /usr/bin/awk '{print $1}')"
-          swift package resolve
-          after="$(shasum -a 256 Package.resolved | /usr/bin/awk '{print $1}')"
-          test "$before" = "$after"
-
-      - name: Test Swift package
-        run: swift test --disable-sandbox
+      - name: Test client package
+        run: swift test --package-path parrot --disable-sandbox
 
       - name: Clean-source audit
         run: ./scripts/clean-source-audit.sh
 
-      - name: Validate release workflow
+      - name: Validate app release workflow
         run: ./scripts/release/validate-workflow.sh
 
-      - name: Build exact unsigned input
-        run: python3 scripts/release/release.py build --swift-build --unsigned-dry-run
+      - name: Build exact unsigned Syrinx.app input
+        run: python3 scripts/release/app-release.py build --swift-build --unsigned-dry-run
 
-      # actions/upload-artifact v4.6.2, reviewed immutable commit.
+      - name: Create immutable app artifact handoff
+        run: |
+          python3 scripts/release/app-release.py create-handoff \
+            --input-dir "$RELEASE_OUTPUT_DIR" \
+            --output-dir "$RUNNER_TEMP/syrinx-app-build-handoff"
+
       - id: upload-build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: trusted-release-build-input
-          path: ${{ env.RELEASE_OUTPUT_DIR }}
+          name: syrinx-app-build-input
+          path: ${{ runner.temp }}/syrinx-app-build-handoff
           if-no-files-found: error
           retention-days: 7
 
@@ -106,100 +82,73 @@ jobs:
     needs: build-verify
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment: release
     permissions:
       contents: read
       actions: read
     env:
       RELEASE_REPO_ROOT: ${{ github.workspace }}
+      RELEASE_OUTPUT_DIR: ${{ runner.temp }}/syrinx-app-signed
       RELEASE_BUILD_ARTIFACT_ID: ${{ needs.build-verify.outputs.artifact-id }}
       RELEASE_BUILD_ARTIFACT_DIGEST: ${{ needs.build-verify.outputs.artifact-digest }}
-      RELEASE_PRODUCT_IDENTITY: ${{ vars.RELEASE_PRODUCT_IDENTITY }}
-      RELEASE_EXECUTABLE: ${{ vars.RELEASE_EXECUTABLE }}
-      RELEASE_PACKAGE_ID: ${{ vars.RELEASE_PACKAGE_ID }}
-      RELEASE_SERVICE_LABEL: ${{ vars.RELEASE_SERVICE_LABEL }}
+      RELEASE_BUILD_ARCHIVE: ${{ runner.temp }}/syrinx-app-build-input.zip
+      RELEASE_BUILD_EXTRACTED_DIR: ${{ runner.temp }}/syrinx-app-build-extracted
+      RELEASE_BUILD_HANDOFF_STATE: ${{ runner.temp }}/syrinx-app-build-handoff.json
+      RELEASE_BUILD_SNAPSHOT_DIR: ${{ runner.temp }}/syrinx-app-build-snapshot
+      RELEASE_BUILD_SNAPSHOT_STATE: ${{ runner.temp }}/syrinx-app-build-snapshot.json
       RELEASE_VERSION: ${{ vars.RELEASE_VERSION }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       RELEASE_APPLICATION_IDENTITY: ${{ vars.RELEASE_APPLICATION_IDENTITY }}
-      RELEASE_INSTALLER_IDENTITY: ${{ vars.RELEASE_INSTALLER_IDENTITY }}
       RELEASE_TEAM_ID: ${{ vars.RELEASE_TEAM_ID }}
-      RELEASE_OWNER: ${{ vars.RELEASE_OWNER }}
-      RELEASE_SECURITY_CONTACT: ${{ vars.RELEASE_SECURITY_CONTACT }}
-      RELEASE_REPOSITORY_URL: ${{ vars.RELEASE_REPOSITORY_URL }}
-      RELEASE_SOURCE_LICENSE: LICENSE
-      RELEASE_NOTICES: THIRD_PARTY_NOTICES.md
-      RELEASE_LICENSES_DIR: LICENSES
-      RELEASE_MODEL_MANIFEST: ModelManifests/parakeet-tdt-0.6b-v3-int8.json
-      RELEASE_EMBEDDED_MODEL_MANIFEST: Sources/SyrinxCore/Resources/parakeet-tdt-0.6b-v3-int8.json
-      RELEASE_COMPATIBILITY: COMPATIBILITY.md
-      RELEASE_SUPPORT: SUPPORT.md
-      RELEASE_CHANGELOG: CHANGELOG.md
+      RELEASE_SIGNING_STATE: ${{ runner.temp }}/syrinx-signing-state.json
+      RELEASE_SIGNING_KEYCHAIN: ${{ runner.temp }}/syrinx-signing.keychain-db
+      RELEASE_TRUSTED_SIGNING_KEYCHAIN: ${{ runner.temp }}/syrinx-signing.keychain-db
+      RELEASE_SIGNING_CLEANUP_PLAN: ${{ runner.temp }}/syrinx-signing-cleanup-plan.json
+      RELEASE_APPLICATION_CERTIFICATE_PATH: ${{ runner.temp }}/syrinx-application.p12
     steps:
-      # actions/checkout v7.0.1, reviewed immutable commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set runner-local release paths
-        run: |
-          {
-            echo "RELEASE_OUTPUT_DIR=$RUNNER_TEMP/trusted-release-snapshot"
-            echo "RELEASE_BUILD_ARCHIVE=$RUNNER_TEMP/trusted-release-build-input.zip"
-            echo "RELEASE_BUILD_EXTRACTED_DIR=$RUNNER_TEMP/trusted-release-extracted"
-            echo "RELEASE_BUILD_SNAPSHOT_DIR=$RUNNER_TEMP/trusted-release-snapshot"
-            echo "RELEASE_BUILD_HANDOFF_STATE=$RUNNER_TEMP/trusted-release-build-handoff.json"
-            echo "RELEASE_BUILD_SNAPSHOT_STATE=$RUNNER_TEMP/trusted-release-build-snapshot.json"
-            echo "RELEASE_SIGNING_STATE=$RUNNER_TEMP/trusted-release-signing-state.json"
-            echo "RELEASE_SIGNING_KEYCHAIN=$RUNNER_TEMP/trusted-release-signing.keychain-db"
-            echo "RELEASE_TRUSTED_SIGNING_KEYCHAIN=$RUNNER_TEMP/trusted-release-signing.keychain-db"
-            echo "RELEASE_SIGNING_CLEANUP_PLAN=$RUNNER_TEMP/trusted-release-signing-cleanup-plan.json"
-            echo "RELEASE_APPLICATION_CERTIFICATE_PATH=$RUNNER_TEMP/trusted-release-application.p12"
-            echo "RELEASE_INSTALLER_CERTIFICATE_PATH=$RUNNER_TEMP/trusted-release-installer.p12"
-            echo "RELEASE_SIGNATURE_PRIVATE_KEY_PATH=$RUNNER_TEMP/trusted-release-signature-private.pem"
-            echo "RELEASE_SIGNATURE_PUBLIC_KEY_PATH=$RUNNER_TEMP/trusted-release-signature-public.pem"
-          } >> "$GITHUB_ENV"
-
       - name: Enforce protected Apple Silicon runner
         run: |
           test "$(uname -m)" = "arm64"
           test "$(sw_vers -productVersion | /usr/bin/cut -d. -f1)" -ge 14
 
-      - name: Resolve checked-out annotated tag target
-        run: python3 scripts/release/release.py resolve-source
+      - name: Resolve checked-out source commit
+        run: echo "RELEASE_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Fetch and verify exact build artifact archive
+      - name: Fetch and verify exact build artifact handoff
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/release/release.py verify-artifact-handoff
 
-      - name: Reverify exact extracted build input
-        run: python3 scripts/release/release.py verify --unsigned-dry-run
+      - name: Import verified unsigned app input
+        run: |
+          python3 scripts/release/app-release.py import-handoff \
+            --input-dir "$RELEASE_BUILD_SNAPSHOT_DIR" \
+            --output-dir "$RELEASE_OUTPUT_DIR"
 
       - name: Prepare temporary signing keychain and notary profile
         env:
           RELEASE_NOTARY_PROFILE: ${{ vars.RELEASE_NOTARY_PROFILE }}
           RELEASE_APPLICATION_CERTIFICATE_BASE64: ${{ secrets.RELEASE_APPLICATION_CERTIFICATE_BASE64 }}
-          RELEASE_INSTALLER_CERTIFICATE_BASE64: ${{ secrets.RELEASE_INSTALLER_CERTIFICATE_BASE64 }}
           RELEASE_APPLICATION_CERTIFICATE_PASSWORD: ${{ secrets.RELEASE_APPLICATION_CERTIFICATE_PASSWORD }}
-          RELEASE_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.RELEASE_INSTALLER_CERTIFICATE_PASSWORD }}
           RELEASE_NOTARY_CREDENTIALS_BASE64: ${{ secrets.RELEASE_NOTARY_CREDENTIALS_BASE64 }}
-          RELEASE_SIGNATURE_PRIVATE_KEY_BASE64: ${{ secrets.RELEASE_SIGNATURE_PRIVATE_KEY_BASE64 }}
-          RELEASE_SIGNATURE_PUBLIC_KEY_BASE64: ${{ secrets.RELEASE_SIGNATURE_PUBLIC_KEY_BASE64 }}
-        run: python3 scripts/release/release.py prepare-signing
+        run: python3 scripts/release/release.py prepare-signing --application-only
 
-      - name: Sign, notarize, staple, and independently verify downloaded input
+      - name: Sign, notarize, staple, and verify Syrinx.app
         env:
           RELEASE_NOTARY_PROFILE: ${{ vars.RELEASE_NOTARY_PROFILE }}
-        run: python3 scripts/release/release.py sign-input
+        run: python3 scripts/release/app-release.py sign-input
 
-      # actions/upload-artifact v4.6.2, reviewed immutable commit.
       - id: upload-release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: trusted-release-assets
+          name: syrinx-app-release-assets
           path: ${{ env.RELEASE_OUTPUT_DIR }}
           if-no-files-found: error
           retention-days: 7
@@ -222,74 +171,49 @@ jobs:
       attestations: write
     env:
       RELEASE_REPO_ROOT: ${{ github.workspace }}
-      RELEASE_PRODUCT_IDENTITY: ${{ vars.RELEASE_PRODUCT_IDENTITY }}
-      RELEASE_EXECUTABLE: ${{ vars.RELEASE_EXECUTABLE }}
-      RELEASE_PACKAGE_ID: ${{ vars.RELEASE_PACKAGE_ID }}
-      RELEASE_SERVICE_LABEL: ${{ vars.RELEASE_SERVICE_LABEL }}
+      RELEASE_OUTPUT_DIR: ${{ runner.temp }}/syrinx-app-release-assets
       RELEASE_VERSION: ${{ vars.RELEASE_VERSION }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       RELEASE_APPLICATION_IDENTITY: ${{ vars.RELEASE_APPLICATION_IDENTITY }}
-      RELEASE_INSTALLER_IDENTITY: ${{ vars.RELEASE_INSTALLER_IDENTITY }}
       RELEASE_TEAM_ID: ${{ vars.RELEASE_TEAM_ID }}
-      RELEASE_OWNER: ${{ vars.RELEASE_OWNER }}
-      RELEASE_SECURITY_CONTACT: ${{ vars.RELEASE_SECURITY_CONTACT }}
-      RELEASE_REPOSITORY_URL: ${{ vars.RELEASE_REPOSITORY_URL }}
-      RELEASE_SOURCE_LICENSE: LICENSE
-      RELEASE_NOTICES: THIRD_PARTY_NOTICES.md
-      RELEASE_LICENSES_DIR: LICENSES
-      RELEASE_MODEL_MANIFEST: ModelManifests/parakeet-tdt-0.6b-v3-int8.json
-      RELEASE_EMBEDDED_MODEL_MANIFEST: Sources/SyrinxCore/Resources/parakeet-tdt-0.6b-v3-int8.json
-      RELEASE_COMPATIBILITY: COMPATIBILITY.md
-      RELEASE_SUPPORT: SUPPORT.md
-      RELEASE_CHANGELOG: CHANGELOG.md
     steps:
-      # actions/checkout v7.0.1, reviewed immutable commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set runner-local release paths
-        run: |
-          {
-            echo "RELEASE_OUTPUT_DIR=$RUNNER_TEMP/trusted-release"
-            echo "RELEASE_SIGNING_STATE=$RUNNER_TEMP/trusted-release-verification-state.json"
-            echo "RELEASE_SIGNATURE_PUBLIC_KEY_PATH=$RUNNER_TEMP/trusted-release-signature-public.pem"
-          } >> "$GITHUB_ENV"
-
       - name: Enforce protected Apple Silicon runner
         run: |
           test "$(uname -m)" = "arm64"
           test "$(sw_vers -productVersion | /usr/bin/cut -d. -f1)" -ge 14
 
-      - name: Resolve checked-out annotated tag target
-        run: python3 scripts/release/release.py resolve-source
+      - name: Resolve checked-out source commit
+        run: echo "RELEASE_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      # actions/download-artifact v4, reviewed immutable commit.
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - name: Fetch signed app release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: trusted-release-assets
+          name: syrinx-app-release-assets
           path: ${{ env.RELEASE_OUTPUT_DIR }}
 
-      - name: Prepare detached-signature verification key
-        env:
-          RELEASE_SIGNATURE_PUBLIC_KEY_BASE64: ${{ secrets.RELEASE_SIGNATURE_PUBLIC_KEY_BASE64 }}
-        run: python3 scripts/release/release.py prepare-verification
+      - name: Reverify signed and notarized Syrinx.app
+        run: python3 scripts/release/app-release.py verify --signed
 
-      - name: Reverify downloaded release bundle before attestation or publish
-        run: python3 scripts/release/release.py verify
-
-      # actions/attest-build-provenance v2.2.3, reviewed immutable commit.
       - uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
         with:
           subject-path: ${{ env.RELEASE_OUTPUT_DIR }}/*
 
-      - name: Publish frozen verified assets
+      - name: Publish Syrinx.app release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/release/release.py publish
-
-      - name: Remove temporary verification material
-        if: ${{ always() }}
-        run: python3 scripts/release/release.py cleanup-signing
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "$RELEASE_OUTPUT_DIR/Syrinx-$RELEASE_VERSION.zip" \
+            "$RELEASE_OUTPUT_DIR/Syrinx-$RELEASE_VERSION.metadata.json" \
+            "$RELEASE_OUTPUT_DIR/Syrinx-$RELEASE_VERSION.notary.json" \
+            "$RELEASE_OUTPUT_DIR/SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Syrinx $RELEASE_VERSION" \
+            --notes "Download Syrinx.app, move it to Applications, open it, grant Microphone and Accessibility access, and hold Fn to dictate."

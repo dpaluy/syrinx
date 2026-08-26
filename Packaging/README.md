@@ -1,5 +1,9 @@
 # Packaging contract
 
+The end-user distribution is the signed and notarized `Syrinx.app` zip built
+by `scripts/release/app-release.py`. This directory documents the separate
+native service package contract used for development and integration.
+
 The release tool creates all packaging assets from a clean exact tag. The
 selected product identity is `Syrinx`, with executable `syrinx`, package
 identifier `com.dpaluy.syrinx`, and service label `com.dpaluy.syrinx`.

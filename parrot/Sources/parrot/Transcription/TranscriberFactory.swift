@@ -1,9 +1,9 @@
 import Foundation
 
-enum TranscriberFactory {
-    static func make(
+public enum TranscriberFactory {
+    public static func make(
         model: TranscriptionModel,
-        parakeetURL: String = ParakeetConfiguration.defaultURL,
+        parakeetURL: String = "http://127.0.0.1:5092",
         parakeetAPIKey: String? = nil
     ) throws -> any Transcriber {
         switch model.engine {
