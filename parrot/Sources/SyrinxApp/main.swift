@@ -85,24 +85,74 @@ private enum PermissionFlow {
     private static let didShowGuidanceKey = "Syrinx.didShowFirstRunGuidance"
 
     static func requestAccess() async -> Bool {
+        var accessibilityRequested = false
+        var microphoneRequested = false
+
         if !UserDefaults.standard.bool(forKey: didShowGuidanceKey) {
             let response = showFirstRunGuidance()
-            UserDefaults.standard.set(true, forKey: didShowGuidanceKey)
-            if response == .alertSecondButtonReturn {
-                openSettings(anchor: "Privacy_Accessibility")
+            guard response == .alertFirstButtonReturn else {
+                return false
             }
+            UserDefaults.standard.set(true, forKey: didShowGuidanceKey)
         }
 
-        let microphoneGranted = await requestMicrophoneIfNeeded()
-        let accessibilityGranted = requestAccessibilityIfNeeded()
-        guard microphoneGranted && accessibilityGranted else {
-            showMissingPermissions(
+        while true {
+            let microphoneGranted = microphoneIsGranted()
+            let accessibilityGranted = requestAccessibilityIfNeeded(prompt: false)
+            let action = SyrinxPermissionFlow.next(
                 microphoneGranted: microphoneGranted,
-                accessibilityGranted: accessibilityGranted
+                accessibilityGranted: accessibilityGranted,
+                accessibilityRequested: accessibilityRequested,
+                microphoneRequested: microphoneRequested
             )
-            return false
+
+            switch action {
+            case .requestAccessibility:
+                accessibilityRequested = true
+                _ = requestAccessibilityIfNeeded(prompt: true)
+            case .requestMicrophone:
+                microphoneRequested = true
+                _ = await requestMicrophoneIfNeeded()
+            case .showSettings:
+                let userAction = showMissingPermissions(
+                    microphoneGranted: microphoneGranted,
+                    accessibilityGranted: accessibilityGranted
+                )
+                let followUp = SyrinxPermissionFlow.next(
+                    microphoneGranted: microphoneGranted,
+                    accessibilityGranted: accessibilityGranted,
+                    accessibilityRequested: accessibilityRequested,
+                    microphoneRequested: microphoneRequested,
+                    userAction: userAction
+                )
+                switch followUp {
+                case .openSettings(let pane):
+                    guard waitForSettings(anchor: settingsAnchor(for: pane)) else {
+                        return false
+                    }
+                    let recheck = SyrinxPermissionFlow.next(
+                        microphoneGranted: microphoneGranted,
+                        accessibilityGranted: accessibilityGranted,
+                        accessibilityRequested: accessibilityRequested,
+                        microphoneRequested: microphoneRequested,
+                        userAction: .checkAgain
+                    )
+                    guard recheck == .recheck else {
+                        return false
+                    }
+                case .recheck:
+                    break
+                case .cancel:
+                    return false
+                default:
+                    return false
+                }
+            case .start:
+                return true
+            case .openSettings, .recheck, .cancel:
+                return false
+            }
         }
-        return true
     }
 
     private static func showFirstRunGuidance() -> NSApplication.ModalResponse {
@@ -111,7 +161,7 @@ private enum PermissionFlow {
         alert.messageText = "Set up Syrinx"
         alert.informativeText = SyrinxAppInfo.firstRunGuidance
         alert.addButton(withTitle: "Continue")
-        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
         return alert.runModal()
     }
 
@@ -132,15 +182,22 @@ private enum PermissionFlow {
         }
     }
 
-    private static func requestAccessibilityIfNeeded() -> Bool {
+    private static func requestAccessibilityIfNeeded(prompt: Bool) -> Bool {
+        guard prompt else {
+            return AXIsProcessTrusted()
+        }
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         return AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+    }
+
+    private static func microphoneIsGranted() -> Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
 
     private static func showMissingPermissions(
         microphoneGranted: Bool,
         accessibilityGranted: Bool
-    ) {
+    ) -> SyrinxPermissionFlowUserAction {
         let missing = [
             microphoneGranted ? nil : "Microphone",
             accessibilityGranted ? nil : "Accessibility",
@@ -148,11 +205,38 @@ private enum PermissionFlow {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Syrinx needs " + missing + " access"
-        alert.informativeText = "Open System Settings > Privacy & Security and enable Syrinx under " + missing + ". Also set the Fn or Globe key to Do Nothing under System Settings > Keyboard, then quit and reopen Syrinx."
+        alert.informativeText = "Enable Syrinx under " + missing + " in System Settings > Privacy & Security. Return to Syrinx and choose Check Again after you grant access."
         alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "OK")
-        if alert.runModal() == .alertFirstButtonReturn {
-            openSettings(anchor: accessibilityGranted ? "Privacy_Microphone" : "Privacy_Accessibility")
+        alert.addButton(withTitle: "Check Again")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return .openSettings
+        case .alertSecondButtonReturn:
+            return .checkAgain
+        default:
+            return .cancel
+        }
+    }
+
+    private static func waitForSettings(anchor: String) -> Bool {
+        openSettings(anchor: anchor)
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Return to Syrinx when access is enabled"
+        alert.informativeText = "Choose Check Again after you enable the requested access. Choose Cancel to leave Syrinx waiting for permissions."
+        alert.addButton(withTitle: "Check Again")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private static func settingsAnchor(for pane: SyrinxPermissionPane) -> String {
+        switch pane {
+        case .microphone:
+            return "Privacy_Microphone"
+        case .accessibility:
+            return "Privacy_Accessibility"
         }
     }
 

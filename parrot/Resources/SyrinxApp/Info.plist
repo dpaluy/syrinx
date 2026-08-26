@@ -6,6 +6,8 @@
     <string>Syrinx</string>
     <key>CFBundleExecutable</key>
     <string>syrinx</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>CFBundleIdentifier</key>
     <string>com.dpaluy.syrinx</string>
     <key>CFBundleInfoDictionaryVersion</key>

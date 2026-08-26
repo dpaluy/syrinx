@@ -25,6 +25,8 @@ EXECUTABLE = "syrinx"
 BUNDLE_IDENTIFIER = "com.dpaluy.syrinx"
 MINIMUM_MACOS = "14.0"
 INFO_PLIST_SOURCE = Path("parrot/Resources/SyrinxApp/Info.plist")
+APP_ICON_FILE = "AppIcon.icns"
+APP_ICON_SOURCE = Path("parrot/Resources/SyrinxApp") / APP_ICON_FILE
 OUTPUT_NAMES = (
     "{product}-{version}.zip",
     "{product}-{version}.metadata.json",
@@ -114,6 +116,7 @@ def validate_source(args: argparse.Namespace) -> None:
     if run_tool(["git", "rev-parse", "refs/tags/" + args.tag + "^{}"], cwd=repo).strip() != args.source_commit:
         fail("annotated tag does not target the declared source commit")
     require_path(repo / INFO_PLIST_SOURCE, "Syrinx Info.plist")
+    require_path(repo / APP_ICON_SOURCE, "Syrinx app icon")
 
 
 def safe_relative(path: Path) -> str:
@@ -185,6 +188,10 @@ def validate_app_bundle(app: Path) -> Dict[str, Any]:
     require_path(plist_path, "app Info.plist")
     require_path(executable, "app executable")
     require_path(resources, "app Resources directory")
+    icon = resources / APP_ICON_FILE
+    require_path(icon, "app icon")
+    if not icon.is_file():
+        fail("app icon is not a regular file")
     try:
         with plist_path.open("rb") as handle:
             info = plistlib.load(handle)
@@ -196,6 +203,7 @@ def validate_app_bundle(app: Path) -> Dict[str, Any]:
         "CFBundleIdentifier": BUNDLE_IDENTIFIER,
         "CFBundleName": PRODUCT,
         "CFBundlePackageType": "APPL",
+        "CFBundleIconFile": APP_ICON_FILE,
         "LSMinimumSystemVersion": MINIMUM_MACOS,
     }
     for key, value in expected.items():
@@ -233,6 +241,10 @@ def make_app(args: argparse.Namespace, binary: Path, destination: Path, workspac
     shutil.copyfile(binary, target)
     os.chmod(target, 0o755)
     copy_runtime(target, contents / "Frameworks")
+    icon_source = require_path(args.repo_root / APP_ICON_SOURCE, "Syrinx app icon")
+    if not icon_source.is_file():
+        fail("Syrinx app icon is not a regular file")
+    shutil.copyfile(icon_source, resources / APP_ICON_FILE)
     with (args.repo_root / INFO_PLIST_SOURCE).open("rb") as handle:
         info = plistlib.load(handle)
     info["CFBundleShortVersionString"] = args.version
