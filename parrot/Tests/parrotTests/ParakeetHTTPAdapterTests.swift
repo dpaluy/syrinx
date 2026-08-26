@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import parrot
+@testable import SyrinxClient
 
 final class ParakeetHTTPAdapterTests: XCTestCase {
     override func tearDown() {

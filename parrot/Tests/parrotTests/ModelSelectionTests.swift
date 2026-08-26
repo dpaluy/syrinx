@@ -1,5 +1,5 @@
 import XCTest
-@testable import parrot
+@testable import SyrinxClient
 
 final class ModelSelectionTests: XCTestCase {
     func testRegistryIncludesServiceBackedParakeetWithoutChangingRecommendation() {

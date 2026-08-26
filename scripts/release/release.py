@@ -748,13 +748,17 @@ def cleanup_signing_state(
 
 
 def prepare_signing(args: argparse.Namespace) -> None:
+    application_only = bool(getattr(args, "application_only", False))
     required = [
-        "signing_state", "signing_keychain", "application_certificate_base64", "installer_certificate_base64",
-        "application_certificate_password", "installer_certificate_password", "notary_credentials_base64",
-        "notary_profile", "team_id", "application_certificate_path", "installer_certificate_path",
-        "signature_private_key_base64", "signature_public_key_base64", "signature_private_key_path", "signature_public_key_path",
-        "cleanup_plan",
+        "signing_state", "signing_keychain", "application_certificate_base64",
+        "application_certificate_password", "notary_credentials_base64", "notary_profile",
+        "team_id", "application_certificate_path", "cleanup_plan",
     ]
+    if not application_only:
+        required.extend([
+            "installer_certificate_base64", "installer_certificate_password", "installer_certificate_path",
+            "signature_private_key_base64", "signature_public_key_base64", "signature_private_key_path", "signature_public_key_path",
+        ])
     missing = [name for name in required if not getattr(args, name, None)]
     if missing:
         fail("prepare-signing is missing: " + ", ".join(missing))
@@ -762,23 +766,22 @@ def prepare_signing(args: argparse.Namespace) -> None:
     state_path = ensure_temp_path(Path(args.signing_state), "signing state", runner_temp)
     keychain_path = ensure_temp_path(Path(args.signing_keychain), "signing keychain", runner_temp)
     cleanup_plan_path = ensure_temp_path(Path(args.cleanup_plan), "trusted cleanup plan", runner_temp)
-    certificate_paths = [
-        ensure_temp_path(Path(args.application_certificate_path), "application certificate", runner_temp),
-        ensure_temp_path(Path(args.installer_certificate_path), "installer certificate", runner_temp),
-    ]
-    signature_paths = [
-        ensure_temp_path(Path(args.signature_private_key_path), "signature private key", runner_temp),
-        ensure_temp_path(Path(args.signature_public_key_path), "signature public key", runner_temp),
-    ]
-    secrets = [
-        args.application_certificate_base64,
-        args.installer_certificate_base64,
-        args.application_certificate_password,
-        args.installer_certificate_password,
-        args.notary_credentials_base64,
-        args.signature_private_key_base64,
-        args.signature_public_key_base64,
-    ]
+    certificate_paths = [ensure_temp_path(Path(args.application_certificate_path), "application certificate", runner_temp)]
+    signature_paths = []
+    if not application_only:
+        certificate_paths.append(ensure_temp_path(Path(args.installer_certificate_path), "installer certificate", runner_temp))
+        signature_paths = [
+            ensure_temp_path(Path(args.signature_private_key_path), "signature private key", runner_temp),
+            ensure_temp_path(Path(args.signature_public_key_path), "signature public key", runner_temp),
+        ]
+    secrets = [args.application_certificate_base64, args.application_certificate_password, args.notary_credentials_base64]
+    if not application_only:
+        secrets.extend([
+            args.installer_certificate_base64,
+            args.installer_certificate_password,
+            args.signature_private_key_base64,
+            args.signature_public_key_base64,
+        ])
     SECRET_VALUES.update(value for value in secrets if value)
     old_keychains: List[str] = []
     try:
@@ -798,18 +801,18 @@ def prepare_signing(args: argparse.Namespace) -> None:
         cleanup_plan["profile"] = args.notary_profile
         write_atomic(cleanup_plan_path, json_bytes(cleanup_plan), mode=0o600)
         write_atomic(state_path, json_bytes(state), mode=0o600)
-        for path, value, label in zip(
-            certificate_paths,
-            (args.application_certificate_base64, args.installer_certificate_base64),
-            ("application certificate", "installer certificate"),
-        ):
+        certificate_values = [(args.application_certificate_base64, "application certificate")]
+        if not application_only:
+            certificate_values.append((args.installer_certificate_base64, "installer certificate"))
+        for path, (value, label) in zip(certificate_paths, certificate_values):
             decode_secret_file(value, path, label)
-        for path, value, label in zip(
-            signature_paths,
-            (args.signature_private_key_base64, args.signature_public_key_base64),
-            ("signature private key", "signature public key"),
-        ):
-            decode_secret_file(value, path, label)
+        if not application_only:
+            for path, value, label in zip(
+                signature_paths,
+                (args.signature_private_key_base64, args.signature_public_key_base64),
+                ("signature private key", "signature public key"),
+            ):
+                decode_secret_file(value, path, label)
         keychain_password = base64.urlsafe_b64encode(os.urandom(24)).decode("ascii")
         secrets.append(keychain_password)
         SECRET_VALUES.add(keychain_password)
@@ -817,7 +820,10 @@ def prepare_signing(args: argparse.Namespace) -> None:
         run_tool(["security", "unlock-keychain", "-p", keychain_password, str(keychain_path)])
         run_tool(["security", "set-keychain-settings", "-lut", "21600", str(keychain_path)])
         run_tool(["security", "list-keychains", "-d", "user", "-s"] + old_keychains + [str(keychain_path)])
-        for path, password in zip(certificate_paths, (args.application_certificate_password, args.installer_certificate_password)):
+        certificate_passwords = [args.application_certificate_password]
+        if not application_only:
+            certificate_passwords.append(args.installer_certificate_password)
+        for path, password in zip(certificate_paths, certificate_passwords):
             SECRET_VALUES.add(password)
             run_tool([
                 "security", "import", str(path), "-k", str(keychain_path), "-P", password,
@@ -841,15 +847,19 @@ def prepare_signing(args: argparse.Namespace) -> None:
         ])
         state["profile"] = args.notary_profile
         write_atomic(state_path, json_bytes(state), mode=0o600)
-        write_github_env({
+        environment = {
             "RELEASE_SIGNING_KEYCHAIN": str(keychain_path),
             "RELEASE_TRUSTED_SIGNING_KEYCHAIN": str(keychain_path),
             "RELEASE_SIGNING_CLEANUP_PLAN": str(cleanup_plan_path),
             "RELEASE_NOTARY_KEYCHAIN": str(keychain_path),
-            "RELEASE_SIGNATURE_PRIVATE_KEY": str(signature_paths[0]),
-            "RELEASE_SIGNATURE_PUBLIC_KEY": str(signature_paths[1]),
             "RELEASE_OLD_KEYCHAINS": json.dumps(old_keychains, separators=(",", ":")),
-        }, Path(args.github_env) if args.github_env else None)
+        }
+        if not application_only:
+            environment.update({
+                "RELEASE_SIGNATURE_PRIVATE_KEY": str(signature_paths[0]),
+                "RELEASE_SIGNATURE_PUBLIC_KEY": str(signature_paths[1]),
+            })
+        write_github_env(environment, Path(args.github_env) if args.github_env else None)
     except BaseException:
         try:
             cleanup_signing_state(
@@ -3770,6 +3780,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--signature-public-key-base64", default=os.environ.get("RELEASE_SIGNATURE_PUBLIC_KEY_BASE64"), required=False)
     prepare.add_argument("--signature-private-key-path", default=os.environ.get("RELEASE_SIGNATURE_PRIVATE_KEY_PATH"), required=False)
     prepare.add_argument("--signature-public-key-path", default=os.environ.get("RELEASE_SIGNATURE_PUBLIC_KEY_PATH"), required=False)
+    prepare.add_argument("--application-only", action="store_true")
     prepare.add_argument("--github-env", default=os.environ.get("GITHUB_ENV"), required=False)
     prepare.set_defaults(handler=handle_prepare_signing)
     prepare_verify = subparsers.add_parser("prepare-verification", help="write a protected detached-signature public key")

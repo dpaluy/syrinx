@@ -7,4 +7,4 @@ if [ "$#" -gt 1 ]; then
   printf '%s\n' 'usage: validate-workflow.sh [workflow-path]' >&2
   exit 64
 fi
-exec python3 "$script_dir/release.py" validate-workflow "$workflow_path"
+exec python3 "$script_dir/app-release.py" validate-workflow "$workflow_path"

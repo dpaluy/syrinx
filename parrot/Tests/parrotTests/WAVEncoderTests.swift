@@ -1,5 +1,5 @@
 import XCTest
-@testable import parrot
+@testable import SyrinxClient
 
 final class WAVEncoderTests: XCTestCase {
     func testEncodes16BitMonoWAVAndClampsSamples() {

@@ -1,16 +1,16 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 
 /// Captures microphone audio while recording is active and returns a 16 kHz
 /// mono Float32 buffer when stopped. Format-converts on the fly so callers
 /// don't have to worry about the input device's native rate.
-final class AudioCapture {
-    enum CaptureError: Error {
+public final class AudioCapture {
+    public enum CaptureError: Error {
         case engineStartFailed(Error)
         case converterCreationFailed
     }
 
-    static let targetSampleRate: Double = 16_000
+    public static let targetSampleRate: Double = 16_000
 
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
@@ -20,10 +20,10 @@ final class AudioCapture {
 
     /// Called for every audio buffer with the buffer's RMS level (0…~1).
     /// Invoked on an arbitrary thread; hop to main if you touch UI.
-    var onLevel: ((Float) -> Void)?
+    public var onLevel: ((Float) -> Void)?
 
     /// Begin recording. Idempotent  -  calling while already recording is a no-op.
-    func start() throws {
+    public func start() throws {
         guard !isRecording else { return }
 
         let input = engine.inputNode
@@ -63,7 +63,7 @@ final class AudioCapture {
 
     /// Stop recording and return all captured samples (16 kHz mono Float32).
     @discardableResult
-    func stop() -> [Float] {
+    public func stop() -> [Float] {
         guard isRecording else { return [] }
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
@@ -90,15 +90,9 @@ final class AudioCapture {
             frameCapacity: outCapacity
         ) else { return }
 
-        var consumed = false
+        let input = ConversionInput(buffer: buffer)
         let inputBlock: AVAudioConverterInputBlock = { _, status in
-            if consumed {
-                status.pointee = .noDataNow
-                return nil
-            }
-            consumed = true
-            status.pointee = .haveData
-            return buffer
+            input.next(status)
         }
 
         var error: NSError?
@@ -116,6 +110,28 @@ final class AudioCapture {
         if let onLevel {
             onLevel(computeRMS(chunk))
         }
+    }
+}
+
+private final class ConversionInput: @unchecked Sendable {
+    private let buffer: AVAudioPCMBuffer
+    private let lock = NSLock()
+    private var consumed = false
+
+    init(buffer: AVAudioPCMBuffer) {
+        self.buffer = buffer
+    }
+
+    func next(_ status: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioPCMBuffer? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !consumed else {
+            status.pointee = .noDataNow
+            return nil
+        }
+        consumed = true
+        status.pointee = .haveData
+        return buffer
     }
 }
 
