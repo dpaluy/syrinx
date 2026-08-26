@@ -1,21 +1,27 @@
-# Parrot client
+# Parrot development component
 
-Parrot is the push-to-talk client in the Syrinx repository. It captures audio,
-uses in-process WhisperKit or an optional loopback service, and inserts the
-transcript at the cursor.
+Parrot is the push-to-talk client used by the Syrinx Mac application. It
+captures audio, uses in-process WhisperKit or the local Syrinx service, and
+inserts the transcript at the cursor. This package is for development. End
+users install and open the Syrinx application.
 
-## Quick start
+## Development
+
+Development requires Xcode 16 or later, or matching Swift 6 command-line
+tools. Run these commands from the `parrot` directory:
 
 ```sh
-swift build --configuration release
-.build/release/parrot setup
-.build/release/parrot
+swift build
+swift test
 ```
 
-Run these commands from the `parrot` directory. Parrot requires macOS 14 or
-later on Apple Silicon and Swift 6. The first launch downloads the recommended
-145 MB Whisper Base English model. A signed binary installer is not published
-yet.
+Run the development executable:
+
+```sh
+.build/debug/parrot setup
+.build/debug/parrot doctor
+.build/debug/parrot
+```
 
 ## How to use
 
@@ -28,10 +34,9 @@ That's it. There is no record button, no stop button, no "send"  -  `fn` is the 
 
 > **Note:** on most modern Macs the `fn` key is the bottom-left key. If yours is set to "Change input source" or "Show emoji & symbols," `parrot setup` will tell you how to flip it back to plain `fn`.
 
-## CLI
+## Development CLI
 
-The examples below use `parrot` as shorthand for
-`.build/release/parrot` when running from a source checkout.
+The examples below use `parrot` as shorthand for the development executable.
 
 ```sh
 parrot                                 # run in the foreground (^C to quit)
@@ -47,12 +52,12 @@ parrot --hotkey right-option           # change the push-to-talk key
 parrot --no-overlay                    # disable the bottom-of-screen pill
 ```
 
-## Parakeet local service (optional)
+## Parakeet development integration
 
-WhisperKit remains the recommended default. `parakeet-tdt-0.6b-v3` uses a
-user-managed local HTTP service; Parrot does not install the service or its
-model files. Syrinx is the supported native service and keeps the model on the
-same Mac without Docker:
+This integration is not part of the end-user application workflow.
+`parakeet-tdt-0.6b-v3` uses a developer-managed local HTTP service. Parrot does
+not install the service or its model files. Syrinx is the supported native
+development service and keeps the model on the same Mac without Docker:
 
 ```sh
 syrinx models install --activate

@@ -1,85 +1,56 @@
 # Syrinx
 
-Syrinx is a macOS project for private, local speech-to-text. It contains:
-
-- **Parrot**, a push-to-talk dictation client that records while you hold the
-  Fn key and inserts the transcript at the cursor.
-- **Syrinx**, a native Parakeet transcription service that runs on the local
-  Mac and provides a loopback HTTP API.
-
-Audio stays on the Mac. Neither component supports cloud transcription.
+Syrinx is a private, local speech-to-text application for macOS. Hold the Fn
+key, speak, and release it. Syrinx inserts the transcript at the active cursor.
+Audio and transcription stay on the Mac.
 
 ## Project status
 
-Syrinx is pre-release software. Source builds are available. Signed and
-notarized installers are not available yet.
-
-The Parrot client uses WhisperKit with the English Whisper Base model by
-default. The optional Syrinx service uses Parakeet. The unresolved Parakeet
-model-license metadata blocks a binary release, as documented in
-[the model license review](docs/model-license-review.md).
+Syrinx is pre-release software. A signed and notarized Mac application is not
+available yet. When the first release is published, the Quick Start below will
+be the supported installation path.
 
 ## Requirements
 
 - Apple Silicon Mac
 - macOS 14 or later
-- Xcode 16 or later, or matching Swift 6 command-line tools
 - Internet access for the first Whisper model download
 
 ## Quick start
 
-Build the Parrot dictation client from the repository root:
-
-```sh
-swift build --package-path parrot --configuration release
-```
-
-Grant microphone and Accessibility access to the terminal that will run
-Parrot:
-
-```sh
-./parrot/.build/release/parrot setup
-```
-
-Start dictation:
-
-```sh
-./parrot/.build/release/parrot
-```
+1. Open the [latest Syrinx release](https://github.com/dpaluy/syrinx/releases/latest).
+2. Download and install the Mac application.
+3. Open Syrinx from the Applications folder.
+4. Approve the macOS permissions described below.
 
 The first launch downloads and loads the recommended Whisper Base English
-model. When Parrot reports that it is listening, hold Fn, speak, and release
-Fn. Press Control-C in the terminal to stop it.
+model. When Syrinx is ready, place the cursor in any text field. Hold Fn,
+speak, and release Fn.
 
-See [the Parrot guide](parrot/README.md) for model choices, launch-at-login,
-permission troubleshooting, and the optional Syrinx service.
+## Required macOS permissions
 
-## Optional Parakeet service
+Syrinx needs these permissions:
 
-Build the native Syrinx service:
+- **Microphone** to record audio while you hold Fn.
+- **Accessibility** to detect the global Fn key and insert the transcript at
+  the active cursor.
 
-```sh
-swift build --configuration release
-./.build/release/syrinx --help
-./.build/release/syrinx doctor
-```
+Syrinx requests both permissions when you first open it. You can also enable
+them manually:
 
-Before installing the Parakeet model, read the
-[model license review](docs/model-license-review.md). Model bytes are
-downloaded from the pinned upstream source and are never stored in this
-repository or bundled in a release.
+1. Open **System Settings > Privacy & Security > Microphone** and enable
+   **Syrinx**.
+2. Open **System Settings > Privacy & Security > Accessibility** and enable
+   **Syrinx**.
+3. Quit and reopen Syrinx after you change Accessibility access.
 
-```sh
-./.build/release/syrinx models install --activate
-./.build/release/syrinx service install
-./.build/release/syrinx service start
-./parrot/.build/release/parrot run \
-  --model parakeet-tdt-0.6b-v3 \
-  --syrinx-url http://127.0.0.1:5092
-```
+Syrinx also requires this keyboard setting:
 
-The service binds to `127.0.0.1:5092` by default and rejects non-loopback
-hosts.
+1. Open **System Settings > Keyboard**.
+2. Set **Press Fn key to** or **Press Globe key to** to **Do Nothing**.
+
+Syrinx does not require Full Disk Access, Screen Recording, Input Monitoring,
+or Automation permission.
 
 ## Repository layout
 
@@ -99,6 +70,11 @@ independent dependency graph.
 
 ## Development
 
+Development requires Xcode 16 or later, or matching Swift 6 command-line
+tools. The source tree contains a Parrot push-to-talk client and a Syrinx
+Parakeet transcription service. End users do not run these components or their
+scripts separately.
+
 Build both packages:
 
 ```sh
@@ -116,6 +92,23 @@ Run the test suites and repository checks:
 
 Real-model integration tests require separately managed model and audio
 fixtures. Tests that need those fixtures report a skip when they are absent.
+
+The native Parakeet service is only a development and integration component.
+It is not part of the end-user application workflow. Before installing its
+model, read the
+[model license review](docs/model-license-review.md).
+
+```sh
+./.build/release/syrinx models install --activate
+./.build/release/syrinx service install
+./.build/release/syrinx service start
+./parrot/.build/release/parrot run \
+  --model parakeet-tdt-0.6b-v3 \
+  --syrinx-url http://127.0.0.1:5092
+```
+
+The service binds to `127.0.0.1:5092` by default and rejects non-loopback
+hosts. Model bytes are not stored in this repository or bundled in a release.
 
 ## Documentation
 
