@@ -11,9 +11,9 @@ transcription.
 
 Syrinx is pre-release software. A signed and notarized Mac application is not
 available until the signing, notarization, and clean-machine gates pass. The
-release workflow publishes `Syrinx.app` only when those gates pass. The native
-Parakeet service is a development and integration component. It is not part of
-the end-user application.
+maintainer publishes `Syrinx.app` only after those gates pass on a local Mac.
+The native Parakeet service is a development and integration component. It is
+not part of the end-user application.
 
 ## Requirements
 
@@ -74,8 +74,10 @@ Run the test suites and repository checks:
 ```sh
 ./scripts/test-all.sh
 ./scripts/clean-source-audit.sh
-./scripts/release/validate-workflow.sh
 ```
+
+GitHub Actions does not build or test this macOS application. Run all build,
+test, signing, and notarization checks on a local Mac.
 
 Build the client app and run its tests:
 

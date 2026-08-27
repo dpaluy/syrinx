@@ -19,8 +19,10 @@ Before opening a pull request, run:
 ```sh
 ./scripts/test-all.sh
 ./scripts/clean-source-audit.sh
-./scripts/release/validate-workflow.sh
 ```
+
+GitHub Actions does not build or test this macOS application. Run these checks
+on a local Mac before you open a pull request.
 
 State which checks passed and which environment-dependent checks were skipped.
 Do not claim real-model, signing, notarization, installation, or clean-machine
