@@ -3,27 +3,44 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 
-/// Watches a single modifier key (default: Fn) and emits press/release edges.
+public protocol HotkeyMonitoring: AnyObject {
+    var choice: HotkeyChoice { get }
+    func start(onEvent: @escaping (HotkeyMonitor.Event) -> Void) throws
+    func stop()
+}
+
+/// Watches a single modifier key and emits press/release edges.
 /// Requires Accessibility permission. If the tap fails to register, callers
 /// will see an error from `start()`.
-public final class HotkeyMonitor {
-    public enum Event { case pressed, released }
+public final class HotkeyMonitor: HotkeyMonitoring {
+    public enum Event: Equatable { case pressed, released }
     public enum HotkeyError: Error { case tapCreateFailed }
 
-    /// Mask of the modifier we treat as the hotkey. Fn = `.maskSecondaryFn`.
-    private let mask: CGEventFlags
+    public private(set) var choice: HotkeyChoice
     private let debug: Bool
     private var onEvent: ((Event) -> Void)?
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isPressed = false
 
-    public init(mask: CGEventFlags = .maskSecondaryFn, debug: Bool = false) {
-        self.mask = mask
+    public init(choice: HotkeyChoice = .fnOrGlobe, debug: Bool = false) {
+        self.choice = choice
         self.debug = debug
     }
 
+    /// Compatibility initializer for callers that used the original Fn mask.
+    public convenience init(mask: CGEventFlags, debug: Bool = false) {
+        let choice: HotkeyChoice = mask.contains(.maskCommand)
+            ? .rightCommand
+            : mask.contains(.maskAlternate) ? .rightOption : .fnOrGlobe
+        self.init(choice: choice, debug: debug)
+    }
+
+    /// Mask of the selected modifier, retained for compatibility with older callers.
+    public var mask: CGEventFlags { choice.requiredFlags }
+
     public func start(onEvent: @escaping (Event) -> Void) throws {
+        stop()
         self.onEvent = onEvent
 
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
@@ -35,7 +52,7 @@ public final class HotkeyMonitor {
             throw HotkeyError.tapCreateFailed
         }
 
-        let mask: CGEventMask =
+        let eventMask: CGEventMask =
             (1 << CGEventType.flagsChanged.rawValue)
             | (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.keyUp.rawValue)
@@ -48,7 +65,7 @@ public final class HotkeyMonitor {
                 tap: .cgSessionEventTap,
                 place: .headInsertEventTap,
                 options: .listenOnly,
-                eventsOfInterest: mask,
+                eventsOfInterest: eventMask,
                 callback: hotkeyCallback,
                 userInfo: userInfo
             )
@@ -74,9 +91,10 @@ public final class HotkeyMonitor {
         tap = nil
         runLoopSource = nil
         onEvent = nil
+        isPressed = false
     }
 
-    fileprivate func handle(type: CGEventType, event: CGEvent) {
+    internal func handle(type: CGEventType, event: CGEvent) {
         if debug {
             let flags = event.flags
             let keycode = event.getIntegerValueField(.keyboardEventKeycode)
@@ -87,10 +105,20 @@ public final class HotkeyMonitor {
                 ))
         }
         guard type == .flagsChanged else { return }
-        let pressed = event.flags.contains(mask)
-        guard pressed != isPressed else { return }
-        isPressed = pressed
-        onEvent?(pressed ? .pressed : .released)
+        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        guard keyCode == Int64(choice.keyCode) else { return }
+        if isPressed {
+            isPressed = false
+            onEvent?(.released)
+        } else {
+            guard event.flags.contains(choice.requiredFlags) else { return }
+            isPressed = true
+            onEvent?(.pressed)
+        }
+    }
+
+    internal func setTestingHandler(_ onEvent: @escaping (Event) -> Void) {
+        self.onEvent = onEvent
     }
 }
 

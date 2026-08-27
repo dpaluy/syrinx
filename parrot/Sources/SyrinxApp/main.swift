@@ -54,7 +54,7 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
             session.setStatus("could not start")
             showError(
                 title: "Syrinx could not start",
-                message: "Syrinx could not load the local Whisper model or register the Fn key. Check Microphone, Accessibility, and the Fn or Globe key setting."
+                message: "Syrinx could not load the local Whisper model or register the selected shortcut. Check Microphone and Accessibility access, then verify the selected shortcut is available."
             )
         }
     }

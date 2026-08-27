@@ -9,21 +9,35 @@ public final class MenuBarController {
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
     private let modelID: String
+    private var settingsAction: (() -> Void)?
+    private var modelState: ModelLifecycleState?
+    private var hotkeyChoice: HotkeyChoice = .fnOrGlobe
+    private var isBusy = false
+    private var isStarted = false
 
-    public init(modelID: String) {
+    public init(modelID: String, settingsAction: (() -> Void)? = nil) {
         self.modelID = modelID
+        self.settingsAction = settingsAction
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        stateLabel = NSMenuItem(title: "ready · hold Fn to dictate", action: nil, keyEquivalent: "")
+        stateLabel = NSMenuItem(title: "not listening", action: nil, keyEquivalent: "")
         stateLabel.isEnabled = false
         menu.addItem(stateLabel)
 
         modelLabel = NSMenuItem(title: "model: \(modelID)", action: nil, keyEquivalent: "")
         modelLabel.isEnabled = false
         menu.addItem(modelLabel)
+
+        let settings = NSMenuItem(
+            title: "Settings...",
+            action: #selector(settingsClicked),
+            keyEquivalent: ","
+        )
+        settings.target = self
+        menu.addItem(settings)
 
         menu.addItem(.separator())
 
@@ -39,16 +53,70 @@ public final class MenuBarController {
         configureButton(recording: false)
     }
 
+    public func setSettingsAction(_ action: (() -> Void)?) {
+        settingsAction = action
+    }
+
+    public func bind(to state: SettingsState) {
+        state.addObserver { [weak self, weak state] in
+            guard let self, let state else { return }
+            self.modelState = state.modelState
+            self.hotkeyChoice = state.hotkeyChoice
+            self.renderState()
+        }
+    }
+
     public func setRecording(_ recording: Bool) {
-        stateLabel.title = recording ? "● recording" : "ready · hold Fn to dictate"
+        isBusy = recording
+        if recording {
+            stateLabel.title = "● recording"
+        } else {
+            renderState()
+        }
     }
 
     public func setTranscribing() {
+        isBusy = true
         stateLabel.title = "transcribing…"
     }
 
+    public func setStarted(_ started: Bool) {
+        isStarted = started
+        renderState()
+    }
+
     public func setStatus(_ status: String) {
+        isBusy = false
         stateLabel.title = status
+    }
+
+    public func setModelState(_ state: ModelLifecycleState) {
+        modelState = state
+        renderState()
+    }
+
+    public func setHotkeyChoice(_ choice: HotkeyChoice) {
+        hotkeyChoice = choice
+        renderState()
+    }
+
+    private func renderState() {
+        guard !isBusy else { return }
+        guard isStarted else {
+            if let modelState, case .failed = modelState {
+                stateLabel.title = modelState.displayText
+            } else {
+                stateLabel.title = "not listening"
+            }
+            return
+        }
+        if case .ready? = modelState {
+            stateLabel.title = "ready · hold \(hotkeyChoice.displayName) to dictate"
+        } else if let modelState {
+            stateLabel.title = modelState.displayText
+        } else {
+            stateLabel.title = "ready · hold \(hotkeyChoice.displayName) to dictate"
+        }
     }
 
     private func configureButton(recording: Bool) {
@@ -84,5 +152,9 @@ public final class MenuBarController {
 
     @objc private func quitClicked() {
         NSApp.terminate(nil)
+    }
+
+    @objc private func settingsClicked() {
+        settingsAction?()
     }
 }
