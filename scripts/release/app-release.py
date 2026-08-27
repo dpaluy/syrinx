@@ -655,63 +655,6 @@ def validate_source_command(args: argparse.Namespace) -> None:
     print(json.dumps({"tag": args.tag, "sourceCommit": args.source_commit, "annotated": True, "clean": True}, sort_keys=True))
 
 
-def validate_workflow(path: Path) -> None:
-    text = path.read_text(encoding="utf-8")
-    uses = re.findall(r"(?m)^\s*-?\s*uses:\s*([^\s#]+)", text)
-    if not uses or any(not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", value) for value in uses):
-        fail("workflow actions must use full commit SHAs")
-    required = (
-        "app-release.py build --swift-build --unsigned-dry-run",
-        "app-release.py create-handoff",
-        "app-release.py import-handoff",
-        "app-release.py sign-input",
-        "verify-artifact-handoff",
-        "GITHUB_TOKEN: ${{ github.token }}",
-        "RELEASE_BUILD_ARTIFACT_ID",
-        "RELEASE_BUILD_ARTIFACT_DIGEST",
-        "RELEASE_BUILD_ARCHIVE",
-        "RELEASE_BUILD_HANDOFF_STATE",
-        "RELEASE_BUILD_SNAPSHOT_DIR",
-        "actions/upload-artifact",
-        "actions/download-artifact",
-        "actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2",
-        "runs-on: macos-26",
-        "test \"$(uname -m)\" = \"arm64\"",
-        "environment: release",
-        "environment: release-publish",
-        "prepare-signing",
-        "prepare-signing --application-only",
-        "cleanup-signing",
-        "gh release create",
-    )
-    for marker in required:
-        if marker not in text:
-            fail("workflow is missing required app release marker: " + marker)
-    build_block = text.split("  sign-notarize:", 1)[0]
-    sign_block = text.split("  sign-notarize:", 1)[1].split("  publish:", 1)[0]
-    if any(secret in build_block for secret in (
-        "RELEASE_APPLICATION_CERTIFICATE_BASE64",
-        "RELEASE_INSTALLER_CERTIFICATE_BASE64",
-        "RELEASE_APPLICATION_CERTIFICATE_PASSWORD",
-        "RELEASE_NOTARY_CREDENTIALS_BASE64",
-        "GH_TOKEN",
-    )):
-        fail("build job receives signing or publication secrets")
-    if "GH_TOKEN" in sign_block:
-        fail("signing job receives the publication token")
-    if "RELEASE_INSTALLER_" in text or "RELEASE_SIGNATURE_" in text:
-        fail("Syrinx.app release must not require native service installer or detached-signature material")
-    if "actions/download-artifact" in sign_block:
-        fail("signing job must verify the exact artifact through the scoped GitHub API")
-    if sign_block.index("verify-artifact-handoff") > sign_block.index("Prepare temporary signing keychain"):
-        fail("artifact handoff digest must be verified before signing secrets are prepared")
-    if text.count("always()") < 1 or text.count("cleanup-signing") < 1:
-        fail("signing material cleanup is not always configured")
-    if "contents: write" in text.split("  publish:", 1)[0]:
-        fail("build and signing jobs must not receive contents write")
-    print(json.dumps({"workflow": str(path), "pinnedActions": len(uses), "runner": "macos-26", "architecture": "arm64"}, sort_keys=True))
-
-
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="app-release.py")
     subparsers = result.add_subparsers(dest="command", required=True)
@@ -759,9 +702,6 @@ def parser() -> argparse.ArgumentParser:
     import_handoff_parser.add_argument("--input-dir", type=Path, required=True)
     import_handoff_parser.set_defaults(handler=import_handoff)
 
-    workflow_command = subparsers.add_parser("validate-workflow")
-    workflow_command.add_argument("workflow", type=Path)
-    workflow_command.set_defaults(handler=lambda args: validate_workflow(args.workflow.resolve()))
     return result
 
 

@@ -1,39 +1,38 @@
 # Release operations
 
-The protected release workflow builds and publishes `Syrinx.app`. It does not
-run a Terminal command, model service, Docker container, or source build for
-the end user.
+Syrinx builds, tests, signs, and notarizes releases on a local maintainer Mac.
+GitHub Actions must not build or test the macOS application.
 
-## Jobs
+## Local verification
 
-1. `build-verify` checks out the exact annotated tag, confirms an arm64 macOS
-   runner, runs the client tests and clean-source audit, validates the workflow,
-   and creates an unsigned app archive.
-2. `sign-notarize` verifies the uploaded artifact ID and digest before it
-   receives signing credentials, imports that exact app input, signs the app
-   with Developer ID Application, submits the app to Apple notarization,
-   staples the ticket, and verifies the signed app.
-3. `publish` checks out the same tag, independently verifies the signed app and
-   checksums, attests the output assets, and publishes the app archive to the
-   GitHub Release.
-
-The signing environment must provide the protected certificate and
-notarytool inputs described by the `RELEASE_*` environment contract. The
-workflow scopes certificate, password, notary, and publication values to the
-steps that need them. Cleanup runs after signing even when signing fails.
-
-## Local checks
+Run the complete local checks before a release:
 
 ```sh
+./scripts/test-all.sh
+./scripts/clean-source-audit.sh
 ./scripts/release/build-app.sh --swift-build --unsigned-dry-run \
   --skip-source-validation
-./scripts/release/validate-workflow.sh
 ```
 
-The local build is unsigned. It proves app wrapping, plist identity,
-permission declarations, archive contents, and checksums. It does not prove
-Developer ID signing, Apple notarization, stapling, Gatekeeper, installation,
-or GitHub publication.
+The unsigned dry run proves app wrapping, plist identity, permission
+declarations, archive contents, and checksums. It does not prove Developer ID
+signing, Apple notarization, stapling, Gatekeeper acceptance, installation, or
+publication.
+
+## Signed release
+
+Create the release from a clean checkout at the exact annotated release tag.
+Set the required `RELEASE_*` values in the local environment, then run:
+
+```sh
+./scripts/release/build-app.sh --swift-build --sign
+./scripts/release/verify-app.sh --signed
+```
+
+The signing identity and notary profile stay on the maintainer Mac. The release
+tool signs `Syrinx.app`, submits it to Apple notarization, staples the ticket,
+and verifies the signed output. Publish the verified files from `dist/` to the
+matching GitHub Release only after these commands pass.
 
 ## Service tooling
 

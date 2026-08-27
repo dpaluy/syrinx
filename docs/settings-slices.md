@@ -15,7 +15,7 @@ Ground truth: `docs/settings-shaping.md`.
 | V3 | Select a supported shortcut and use it without restarting Syrinx. | Hotkey choice, idle-state event-tap restart, runtime status. |
 | V4 | Toggle launch at login and see the actual macOS registration or approval state. | `SMAppService.mainApp` integration. |
 
-The CI edit is a delivery task after V4. It is not a product slice because it has no user-visible app output.
+The GitHub Actions removal is a delivery task after V4. It is not a product slice because it has no user-visible app output.
 
 ## V1: Settings, app identity, and model state
 
@@ -118,21 +118,21 @@ The CI edit is a delivery task after V4. It is not a product slice because it ha
 - A needs-approval state tells the user to approve Syrinx in System Settings.
 - Enable starts Syrinx after a real logout and login. Disable prevents the next login launch.
 
-## CI delivery task
+## GitHub Actions removal
 
 ### Change
 
-- Remove the `Test` step from the `native` job in `.github/workflows/ci.yml`.
-- Remove the `Test` step from the `parrot` job in `.github/workflows/ci.yml`.
-- Keep checkout, clean source audit, release workflow validation, and both build steps.
-- Do not change `.github/workflows/release.yml` or delete repository tests.
+- Delete `.github/workflows/ci.yml`.
+- Delete `.github/workflows/release.yml`.
+- Delete the app workflow validator and its wrapper script.
+- Keep repository tests and local build, audit, signing, and notarization tools.
 
 ### Verification
 
-1. Parse the workflow as YAML.
-2. Confirm `.github/workflows/ci.yml` has no `swift test` command and no step named `Test`.
-3. Confirm both `swift build` commands remain.
-4. Run local focused tests before the CI edit is accepted, even though GitHub CI will no longer run them.
+1. Confirm `.github/workflows` contains no workflow files.
+2. Confirm `.github` contains no macOS runner, `swift build`, or `swift test` command.
+3. Run local focused tests and the clean-source audit.
+4. Confirm the local app release command remains available.
 
 ## Final acceptance gate
 
@@ -143,4 +143,4 @@ The CI edit is a delivery task after V4. It is not a product slice because it ha
 5. Verify model download and cached-model flows with separate disposable model locations.
 6. Verify all three shortcuts in the packaged app.
 7. Verify launch-at-login enable and disable across real login sessions.
-8. Confirm the CI workflow contains builds and audits but no tests.
+8. Confirm GitHub contains no macOS build or test workflow.

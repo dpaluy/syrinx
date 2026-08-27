@@ -11,6 +11,8 @@ shaping: true
 > Remove all tests from .github ci
 >
 > Let's plan this functionality.
+>
+> Remove all macos build from github. We never want to build on github. I'm not sure we need ci.yml
 
 ## Confirmed decisions
 
@@ -21,14 +23,15 @@ shaping: true
 | D3 | “Start at logging” means “launch Syrinx at macOS login.” It applies to the packaged Syrinx app, not the legacy `parrot` CLI LaunchAgent. |
 | D4 | “Downloaded” means that WhisperKit resolved the selected model to local files. “Ready” means that the model also loaded successfully. |
 | D5 | “Remove all tests from .github ci” means remove the two `swift test` steps from `.github/workflows/ci.yml`. Keep build and audit steps, local test targets, and `.github/workflows/release.yml` unchanged. |
+| D6 | The later instruction supersedes D5. Delete the GitHub CI and release workflows. Build, test, sign, and notarize the macOS application only on a local Mac. |
 
 ## Problem
 
-Syrinx has no settings surface. The packaged app always uses the recommended Whisper model, always listens for Fn or Globe, and inserts the transcript without a trailing space. Users cannot enable launch at login. The menu shows the model identifier but not the app version or a clear model download state. The main CI workflow runs both native and client test suites.
+Syrinx has no settings surface. The packaged app always uses the recommended Whisper model, always listens for Fn or Globe, and inserts the transcript without a trailing space. Users cannot enable launch at login. The menu shows the model identifier but not the app version or a clear model download state. GitHub workflows build the macOS application.
 
 ## Outcome
 
-Users can open one settings window from the menu bar, change dictation spacing, select a supported hold shortcut, and control launch at login. The same window shows the packaged version, active model, and model download or readiness state. The main CI workflow builds and audits without running test commands.
+Users can open one settings window from the menu bar, change dictation spacing, select a supported hold shortcut, and control launch at login. The same window shows the packaged version, active model, and model download or readiness state. All macOS build, test, signing, and notarization work runs locally.
 
 ## Requirements
 
@@ -40,7 +43,7 @@ Users can open one settings window from the menu bar, change dictation spacing, 
 | R3 | Let users enable or disable launch at login for the packaged Syrinx app. Show approval and failure states without claiming success. | Must-have |
 | R4 | Display the packaged app version and the active transcription model. | Must-have |
 | R5 | Display whether the model is checking, downloading, downloaded, loading, ready, or failed. | Must-have |
-| R6 | Remove test commands from `.github/workflows/ci.yml` while retaining build and source or workflow audit steps. | Must-have |
+| R6 | Remove GitHub workflows that build or test the macOS application. Keep local build, test, audit, signing, and notarization tools. | Must-have |
 | R7 | Preserve the current permission flow, local transcription behavior, menu-bar lifecycle, and local test targets. | Must-have |
 
 ## CURRENT: Fixed menu-bar app
@@ -51,7 +54,7 @@ Users can open one settings window from the menu bar, change dictation spacing, 
 | CURRENT2 | `DictationSession` creates `HotkeyMonitor()` with the fixed Fn flag and sends raw successful text to `TextInjector.inject(_:)`. | |
 | CURRENT3 | `MenuBarController` shows runtime state and the model identifier, then provides only Quit. | |
 | CURRENT4 | `WhisperKitTranscriber.prepare()` lets `WhisperKit` download and load in one opaque initialization call. | |
-| CURRENT5 | `.github/workflows/ci.yml` runs `swift test` in both the root and `parrot` packages. | |
+| CURRENT5 | The CI and release workflows build the macOS application on GitHub runners. | |
 
 ## A: AppKit settings with persisted runtime preferences
 
@@ -65,7 +68,7 @@ Users can open one settings window from the menu bar, change dictation spacing, 
 | A6 | Read the version from the packaged bundle. Pass the active `TranscriptionModel` and app version into a shared observable settings state. | |
 | A7 | Split Whisper model resolution from loading. Use the pinned WhisperKit 0.18.0 download API and progress callback, then initialize from the resolved local folder with download disabled. Publish checking, downloading, downloaded, loading, ready, and failed states. | |
 | A8 | Bind the settings labels and the existing menu status to the shared observable state. Disable the shortcut popup while recording or transcribing. | |
-| A9 | Delete only the two `swift test` steps from `.github/workflows/ci.yml`. Keep repository tests and release workflow checks. | |
+| A9 | Delete `.github/workflows/ci.yml`, `.github/workflows/release.yml`, and the app workflow validator. Preserve local tests and release tools. | |
 
 ## Fit check: R x A
 
@@ -77,7 +80,7 @@ Users can open one settings window from the menu bar, change dictation spacing, 
 | R3 | Let users enable or disable launch at login for the packaged Syrinx app. Show approval and failure states without claiming success. | Must-have | ✅ |
 | R4 | Display the packaged app version and the active transcription model. | Must-have | ✅ |
 | R5 | Display whether the model is checking, downloading, downloaded, loading, ready, or failed. | Must-have | ✅ |
-| R6 | Remove test commands from `.github/workflows/ci.yml` while retaining build and source or workflow audit steps. | Must-have | ✅ |
+| R6 | Remove GitHub workflows that build or test the macOS application. Keep local build, test, audit, signing, and notarization tools. | Must-have | ✅ |
 | R7 | Preserve the current permission flow, local transcription behavior, menu-bar lifecycle, and local test targets. | Must-have | ✅ |
 
 ## Detail A: Breadboard
@@ -140,5 +143,5 @@ Users can open one settings window from the menu bar, change dictation spacing, 
 - Do not add model selection. Show the model that the current session uses.
 - Do not reuse or modify the legacy `com.digimata.parrot` LaunchAgent.
 - Do not add arbitrary key chords in this change.
-- Do not remove test files, SwiftPM test targets, release checks, or local test commands.
+- Do not remove test files, SwiftPM test targets, local release checks, or local test commands.
 - Do not change microphone, Accessibility, or local-only data behavior.
