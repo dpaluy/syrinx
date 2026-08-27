@@ -2,6 +2,50 @@ import XCTest
 @testable import SyrinxClient
 
 final class ModelLifecycleTests: XCTestCase {
+    func testSystemLoaderUsesInstalledModelWithoutDownloading() async throws {
+        let documentsDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let modelFolder = documentsDirectory
+            .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml/openai_whisper-base.en", isDirectory: true)
+        try FileManager.default.createDirectory(at: modelFolder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: documentsDirectory) }
+
+        let downloads = DownloadRecorder()
+        let loader = SystemWhisperKitModelLoader(
+            documentsDirectory: documentsDirectory,
+            download: { _ in
+                await downloads.record()
+                throw FakeLoaderError.failed
+            }
+        )
+
+        let resolvedFolder = try await loader.resolve(modelID: "openai_whisper-base.en") { _ in }
+        let downloadCount = await downloads.count
+
+        XCTAssertEqual(resolvedFolder, modelFolder)
+        XCTAssertEqual(downloadCount, 0)
+    }
+
+    func testSystemLoaderDownloadsWhenInstalledModelIsAbsent() async throws {
+        let documentsDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloadedFolder = URL(fileURLWithPath: "/tmp/downloaded-model")
+        let downloads = DownloadRecorder()
+        let loader = SystemWhisperKitModelLoader(
+            documentsDirectory: documentsDirectory,
+            download: { modelID in
+                await downloads.record(modelID: modelID)
+                return downloadedFolder
+            }
+        )
+
+        let resolvedFolder = try await loader.resolve(modelID: "openai_whisper-base.en") { _ in }
+        let downloadedIDs = await downloads.modelIDs
+
+        XCTAssertEqual(resolvedFolder, downloadedFolder)
+        XCTAssertEqual(downloadedIDs, ["openai_whisper-base.en"])
+    }
+
     func testModelPreparationPublishesDownloadingDownloadedLoadingAndReady() async throws {
         let folder = URL(fileURLWithPath: "/tmp/syrinx-model")
         let loader = FakeWhisperKitModelLoader(folder: folder)
@@ -62,6 +106,15 @@ final class ModelLifecycleTests: XCTestCase {
             let loadedFolders = await loader.loadedFolders
             XCTAssertTrue(loadedFolders.isEmpty)
         }
+    }
+}
+
+private actor DownloadRecorder {
+    private(set) var modelIDs: [String] = []
+    var count: Int { modelIDs.count }
+
+    func record(modelID: String = "") {
+        modelIDs.append(modelID)
     }
 }
 

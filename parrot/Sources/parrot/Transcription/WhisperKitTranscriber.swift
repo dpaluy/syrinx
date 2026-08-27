@@ -13,12 +13,41 @@ public protocol WhisperKitModelLoader: Sendable {
     func load(modelFolder: URL) async throws -> any WhisperKitModelPipeline
 }
 
-private struct SystemWhisperKitModelLoader: WhisperKitModelLoader {
+struct SystemWhisperKitModelLoader: WhisperKitModelLoader {
+    typealias Download = @Sendable (_ modelID: String) async throws -> URL
+
+    private let documentsDirectory: URL
+    private let download: Download?
+
+    init(
+        documentsDirectory: URL? = nil,
+        download: Download? = nil
+    ) {
+        self.documentsDirectory = documentsDirectory
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        self.download = download
+    }
+
     func resolve(
         modelID: String,
         progress: @escaping @Sendable (Double?) -> Void
     ) async throws -> URL {
-        try await WhisperKit.download(
+        let localFolder = documentsDirectory
+            .appendingPathComponent("huggingface", isDirectory: true)
+            .appendingPathComponent("models", isDirectory: true)
+            .appendingPathComponent("argmaxinc", isDirectory: true)
+            .appendingPathComponent("whisperkit-coreml", isDirectory: true)
+            .appendingPathComponent(modelID, isDirectory: true)
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: localFolder.path, isDirectory: &isDirectory),
+           isDirectory.boolValue {
+            return localFolder
+        }
+
+        if let download {
+            return try await download(modelID)
+        }
+        return try await WhisperKit.download(
             variant: modelID,
             downloadBase: nil,
             progressCallback: { progressValue in progress(progressValue.fractionCompleted) }
