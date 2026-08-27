@@ -86,15 +86,20 @@ swift build --package-path parrot --product syrinx --configuration release
 swift test --package-path parrot
 ```
 
-Build an unsigned local app archive:
+### Build a release version
+
+From the repository root, run this command and replace `1.0.0` with the
+version that you want to build:
 
 ```sh
 ./scripts/release/build-app.sh --swift-build --unsigned-dry-run \
-  --skip-source-validation
+  --skip-source-validation --version 1.0.0 --tag v1.0.0 \
+  --output-dir dist/1.0.0
 ```
 
-The local archive is unsigned and is not proof of Apple signing,
-notarization, publication, installation, or Gatekeeper acceptance.
+The command creates `dist/1.0.0/Syrinx-1.0.0.zip`. The archive contains the
+release build of `Syrinx.app`, but it is unsigned. For a signed and notarized
+release, follow the [release operations](docs/release-operations.md).
 
 Real-model integration tests require separately managed model and audio
 fixtures. Tests that need those fixtures report a skip when they are absent.
