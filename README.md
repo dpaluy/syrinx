@@ -9,6 +9,8 @@ transcription.
 
 ## Project status
 
+Current version: **1.0.0**. See the [changelog](CHANGELOG.md) for release notes.
+
 Syrinx is pre-release software. A signed and notarized Mac application is not
 available until the signing, notarization, and clean-machine gates pass. The
 maintainer publishes `Syrinx.app` only after those gates pass on a local Mac.
@@ -141,6 +143,7 @@ the optional native service keep independent dependency graphs.
 - [Native service development notes](docs/native-service.md)
 - [Client architecture](parrot/docs/architecture.md)
 - [Compatibility](COMPATIBILITY.md)
+- [Changelog](CHANGELOG.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 - [Release gates](docs/release-gates.md)
