@@ -42,6 +42,10 @@ and restores the snapshot only if no other process changed the clipboard. The
 Copy Last Dictation menu action copies the last nonempty transcript. Syrinx
 keeps that transcript only in memory and clears it when the app quits.
 
+Press Escape while recording or transcribing to cancel the current dictation.
+Syrinx discards canceled audio and suppresses results that arrive after a
+cancel or stop. A recording that reaches 60 seconds stops and transcribes once.
+
 ## Development CLI
 
 The `parrot` executable remains for client tests and local diagnostics. It is

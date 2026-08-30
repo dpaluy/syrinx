@@ -31,7 +31,13 @@ Syrinx.app
    direct CGEvent typing by default or through explicit clipboard paste mode.
 6. Clipboard paste restores all prior item representations only when the
    pasteboard change count still matches Syrinx's write.
-7. The overlay and menu bar item show recording and transcription state.
+7. `DictationSession` moves through idle, recording, transcribing, and
+   outputting phases. Each dictation has a monotonically increasing token.
+8. Escape, stop, and quit invalidate the active token, stop capture, cancel
+   owned tasks, and clear the overlay and menu state. A late result cannot pass
+   the token check.
+9. The 60-second recording limit stops capture and starts one transcription.
+10. The overlay and menu bar item show recording and transcription state.
 
 Syrinx does not infer whether an application accepted direct typing. Secure
 fields and some Electron applications can reject synthesized text. The last

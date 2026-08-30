@@ -13,7 +13,7 @@ public protocol HotkeyMonitoring: AnyObject {
 /// Requires Accessibility permission. If the tap fails to register, callers
 /// will see an error from `start()`.
 public final class HotkeyMonitor: HotkeyMonitoring {
-    public enum Event: Equatable { case pressed, released }
+    public enum Event: Equatable { case pressed, released, cancel }
     public enum HotkeyError: Error { case tapCreateFailed }
 
     public private(set) var choice: HotkeyChoice
@@ -104,8 +104,12 @@ public final class HotkeyMonitor: HotkeyMonitoring {
                         .utf8
                 ))
         }
-        guard type == .flagsChanged else { return }
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        if type == .keyDown, keyCode == 53 {
+            onEvent?(.cancel)
+            return
+        }
+        guard type == .flagsChanged else { return }
         guard keyCode == Int64(choice.keyCode) else { return }
         if isPressed {
             isPressed = false

@@ -3,6 +3,15 @@ import Foundation
 
 @MainActor
 public final class DictationSession {
+    enum Phase: Equatable {
+        case idle
+        case recording
+        case transcribing
+        case outputting
+    }
+
+    static let maximumRecordingDuration: Duration = .seconds(60)
+
     public enum SessionError: Error {
         case alreadyStarted
         case modelNotReady
@@ -19,12 +28,17 @@ public final class DictationSession {
     private let preferences: AppPreferences
     private let textOutput: any TextOutputting
     private let copyText: (String) -> Void
+    private let recordingLimitWait: @Sendable (Duration) async throws -> Void
     private let loginItemController: LoginItemController
     private let modelStateRelay: ModelStateRelay
     public let settingsState: SettingsState
     private var started = false
     private var prepared = false
     private var workingHotkeyChoice: HotkeyChoice
+    private var recordingLimitTask: Task<Void, Never>?
+    private var transcriptionTask: Task<Void, Never>?
+    private(set) var phase: Phase = .idle
+    private(set) var sessionToken: UInt64 = 0
     private(set) var lastDictation: String?
 
     private lazy var settingsWindow: SettingsWindowController = {
@@ -71,6 +85,7 @@ public final class DictationSession {
         self.preferences = preferences
         self.textOutput = ConfiguredTextOutput(preferences: preferences)
         self.copyText = ClipboardText.copy
+        self.recordingLimitWait = { try await Task.sleep(for: $0) }
         self.loginItemController = LoginItemController()
         self.modelStateRelay = modelStateRelay
         self.settingsState = settingsState
@@ -99,7 +114,10 @@ public final class DictationSession {
         loginItemController: LoginItemController,
         menuBar: MenuBarController,
         textOutput: (any TextOutputting)? = nil,
-        copyText: @escaping (String) -> Void = ClipboardText.copy
+        copyText: @escaping (String) -> Void = ClipboardText.copy,
+        recordingLimitWait: @escaping @Sendable (Duration) async throws -> Void = {
+            try await Task.sleep(for: $0)
+        }
     ) {
         let settingsState = SettingsState(
             model: model,
@@ -117,6 +135,7 @@ public final class DictationSession {
         self.preferences = preferences
         self.textOutput = textOutput ?? ConfiguredTextOutput(preferences: preferences)
         self.copyText = copyText
+        self.recordingLimitWait = recordingLimitWait
         self.loginItemController = loginItemController
         self.modelStateRelay = ModelStateRelay()
         self.settingsState = settingsState
@@ -207,14 +226,21 @@ public final class DictationSession {
     }
 
     public func stop() {
-        guard started else { return }
         monitor.stop()
+        invalidateCurrentSession()
         _ = capture.stop()
+        setPhase(.idle)
         overlay.hide()
-        menuBar.setStarted(false)
         menuBar.setRecording(false)
-        settingsState.setHotkeyChangeAllowed(true)
+        menuBar.setStarted(false)
         started = false
+    }
+
+    public func cancel() {
+        guard phase != .idle else { return }
+        invalidateCurrentSession()
+        _ = capture.stop()
+        resetActiveSessionUI()
     }
 
     /// Applies a new hold shortcut while the session is idle.
@@ -287,7 +313,7 @@ public final class DictationSession {
         menuBar.setStarted(true)
         menuBar.setHotkeyChoice(choice)
         menuBar.setModelState(.ready)
-        settingsState.setHotkeyChangeAllowed(true)
+        setPhase(.idle)
     }
 
     private func publishModelState(_ state: ModelLifecycleState) {
@@ -298,49 +324,117 @@ public final class DictationSession {
     private func handle(_ event: HotkeyMonitor.Event) {
         switch event {
         case .pressed:
-            do {
-                try capture.start()
-                settingsState.setHotkeyChangeAllowed(false)
-                overlay.show(.recording)
-                menuBar.setRecording(true)
-            } catch {
-                menuBar.setStatus("microphone unavailable")
-                settingsState.setHotkeyChangeAllowed(true)
-            }
+            beginRecording()
         case .released:
-            let samples = capture.stop()
-            settingsState.setHotkeyChangeAllowed(false)
-            overlay.show(.transcribing)
-            menuBar.setTranscribing()
-            guard !samples.isEmpty else {
-                overlay.hide()
-                menuBar.setRecording(false)
-                settingsState.setHotkeyChangeAllowed(true)
-                return
-            }
+            guard phase == .recording else { return }
+            finishRecording(token: sessionToken)
+        case .cancel:
+            cancel()
+        }
+    }
 
-            Task { [weak self] in
+    private func beginRecording() {
+        guard started, phase == .idle else { return }
+        let token = nextSessionToken()
+        do {
+            try capture.start()
+            setPhase(.recording)
+            overlay.show(.recording)
+            menuBar.setRecording(true)
+            recordingLimitTask = Task { [weak self] in
                 guard let self else { return }
                 do {
-                    let text = try await transcriber.transcribe(samples)
-                    let transcript = TextOutputPolicy.sanitize(text)
-                    if !transcript.isEmpty,
-                       let output = TextOutputPolicy.output(
-                           for: transcript,
-                           addTrailingSpace: preferences.addTrailingSpace
-                       ) {
-                        lastDictation = transcript
-                        menuBar.setLastDictationAvailable(true)
-                        textOutput.output(output)
-                    }
+                    try await recordingLimitWait(Self.maximumRecordingDuration)
                 } catch {
-                    menuBar.setStatus("transcription failed")
+                    return
                 }
-                overlay.hide()
-                menuBar.setRecording(false)
-                settingsState.setHotkeyChangeAllowed(true)
+                guard sessionToken == token, phase == .recording else { return }
+                finishRecording(token: token)
+            }
+        } catch {
+            menuBar.setStatus("microphone unavailable")
+            setPhase(.idle)
+        }
+    }
+
+    private func finishRecording(token: UInt64) {
+        guard sessionToken == token, phase == .recording else { return }
+        recordingLimitTask?.cancel()
+        recordingLimitTask = nil
+        let samples = capture.stop()
+        guard !samples.isEmpty else {
+            resetActiveSessionUI()
+            return
+        }
+
+        setPhase(.transcribing)
+        overlay.show(.transcribing)
+        menuBar.setTranscribing()
+        let transcriber = self.transcriber
+        transcriptionTask = Task { [weak self, transcriber] in
+            do {
+                let text = try await transcriber.transcribe(samples)
+                guard let self,
+                      sessionToken == token,
+                      phase == .transcribing
+                else { return }
+                setPhase(.outputting)
+                deliver(text)
+                finishTranscription(token: token)
+            } catch {
+                guard let self,
+                      sessionToken == token,
+                      phase == .transcribing
+                else { return }
+                menuBar.setStatus("transcription failed")
+                finishTranscription(token: token)
             }
         }
+    }
+
+    private func deliver(_ text: String) {
+        let transcript = TextOutputPolicy.sanitize(text)
+        guard !transcript.isEmpty,
+              let output = TextOutputPolicy.output(
+                  for: transcript,
+                  addTrailingSpace: preferences.addTrailingSpace
+              )
+        else { return }
+        lastDictation = transcript
+        menuBar.setLastDictationAvailable(true)
+        textOutput.output(output)
+    }
+
+    private func finishTranscription(token: UInt64) {
+        guard sessionToken == token,
+              phase == .transcribing || phase == .outputting
+        else { return }
+        transcriptionTask = nil
+        resetActiveSessionUI()
+    }
+
+    private func resetActiveSessionUI() {
+        setPhase(.idle)
+        overlay.hide()
+        menuBar.setRecording(false)
+    }
+
+    private func setPhase(_ phase: Phase) {
+        self.phase = phase
+        settingsState.setHotkeyChangeAllowed(phase == .idle)
+    }
+
+    private func nextSessionToken() -> UInt64 {
+        sessionToken &+= 1
+        return sessionToken
+    }
+
+    private func invalidateCurrentSession() {
+        sessionToken &+= 1
+        recordingLimitTask?.cancel()
+        recordingLimitTask = nil
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
     }
 
     private static func errorMessage(_ error: Error) -> String {
