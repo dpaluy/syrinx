@@ -22,6 +22,93 @@ public enum SyrinxPermissionPane: Equatable {
     case accessibility
 }
 
+public enum SyrinxPermissionStatus: Equatable, Sendable {
+    case unknown
+    case notDetermined
+    case denied
+    case restricted
+    case granted
+
+    public var displayText: String {
+        switch self {
+        case .unknown:
+            return "Checking"
+        case .notDetermined:
+            return "Not requested"
+        case .denied:
+            return "Not allowed"
+        case .restricted:
+            return "Restricted"
+        case .granted:
+            return "Allowed"
+        }
+    }
+}
+
+public struct SyrinxPermissionState: Equatable, Sendable {
+    public let microphone: SyrinxPermissionStatus
+    public let accessibility: SyrinxPermissionStatus
+
+    public init(
+        microphone: SyrinxPermissionStatus,
+        accessibility: SyrinxPermissionStatus
+    ) {
+        self.microphone = microphone
+        self.accessibility = accessibility
+    }
+
+    public static let unknown = SyrinxPermissionState(
+        microphone: .unknown,
+        accessibility: .unknown
+    )
+    public static let granted = SyrinxPermissionState(
+        microphone: .granted,
+        accessibility: .granted
+    )
+
+    public var allGranted: Bool {
+        microphone == .granted && accessibility == .granted
+    }
+
+    public var recordingUnavailableReason: String? {
+        let microphoneMissing = microphone != .granted
+        let accessibilityMissing = accessibility != .granted
+        switch (microphoneMissing, accessibilityMissing) {
+        case (false, false):
+            return nil
+        case (true, false):
+            return "Microphone permission required"
+        case (false, true):
+            return "Accessibility permission required"
+        case (true, true):
+            return "Microphone and Accessibility permissions required"
+        }
+    }
+
+    public func status(for pane: SyrinxPermissionPane) -> SyrinxPermissionStatus {
+        switch pane {
+        case .microphone:
+            return microphone
+        case .accessibility:
+            return accessibility
+        }
+    }
+
+    public func recoveryTitle(for pane: SyrinxPermissionPane) -> String? {
+        let status = status(for: pane)
+        guard status != .granted, status != .unknown else { return nil }
+        if pane == .microphone, status == .notDetermined {
+            return "Request Microphone Access"
+        }
+        switch pane {
+        case .microphone:
+            return "Open Microphone Settings"
+        case .accessibility:
+            return "Open Accessibility Settings"
+        }
+    }
+}
+
 public enum SyrinxPermissionFlowAction: Equatable {
     case requestAccessibility
     case requestMicrophone

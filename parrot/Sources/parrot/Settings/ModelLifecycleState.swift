@@ -52,6 +52,11 @@ public final class SettingsState {
     public private(set) var shortcutRecordingActive = false
     public private(set) var modelChangeAllowed = true
     public private(set) var shortcutError: String?
+    public private(set) var permissionState: SyrinxPermissionState
+
+    public var recordingUnavailableReason: String? {
+        permissionState.recordingUnavailableReason
+    }
 
     private var observers: [() -> Void] = []
 
@@ -62,7 +67,8 @@ public final class SettingsState {
         preferences: AppPreferences = AppPreferences(),
         modelState: ModelLifecycleState = .checking,
         loginItemStatus: LoginItemStatus = .disabled,
-        loginItemOperationError: String? = nil
+        loginItemOperationError: String? = nil,
+        permissionState: SyrinxPermissionState = .unknown
     ) {
         self.model = model
         self.selectableModels = selectableModels
@@ -72,6 +78,7 @@ public final class SettingsState {
         self.loginItemStatus = loginItemStatus
         self.loginItemOperationError = loginItemOperationError
         self.hotkeyChoice = preferences.hotkeyChoice
+        self.permissionState = permissionState
     }
 
     public func addObserver(_ observer: @escaping () -> Void) {
@@ -133,6 +140,12 @@ public final class SettingsState {
     public func setShortcutError(_ message: String?) {
         guard shortcutError != message else { return }
         shortcutError = message
+        notifyObservers()
+    }
+
+    public func setPermissionState(_ state: SyrinxPermissionState) {
+        guard permissionState != state else { return }
+        permissionState = state
         notifyObservers()
     }
 

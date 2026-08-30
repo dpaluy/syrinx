@@ -392,15 +392,60 @@ final class SettingsWindowControllerTests: XCTestCase {
         )
     }
 
+    func testPermissionRowsShowCurrentStateAndInvokeRecovery() throws {
+        let state = SettingsState(
+            model: TestModel.model,
+            preferences: AppPreferences(defaults: defaults),
+            permissionState: SyrinxPermissionState(
+                microphone: .denied,
+                accessibility: .granted
+            )
+        )
+        var recoveredPane: SyrinxPermissionPane?
+        var recheckCount = 0
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in true },
+            onPermissionRecovery: { recoveredPane = $0 },
+            onPermissionRecheck: { recheckCount += 1 }
+        )
+        controller.showSettings()
+        let contentView = try XCTUnwrap(controller.window?.contentView)
+        let labels = textLabels(in: contentView).map(\.stringValue)
+        let buttons = buttons(in: contentView)
+
+        XCTAssertTrue(labels.contains("Microphone: Not allowed"))
+        XCTAssertTrue(labels.contains("Accessibility: Allowed"))
+        let recovery = try XCTUnwrap(
+            buttons.first { $0.title == "Open Microphone Settings" }
+        )
+        recovery.performClick(nil)
+        XCTAssertEqual(recoveredPane, .microphone)
+        XCTAssertEqual(recheckCount, 1)
+        XCTAssertFalse(buttons.contains { $0.title == "Open Accessibility Settings" })
+    }
+
     private func interactiveControls(in view: NSView) -> [NSView] {
         var controls: [NSView] = []
-        if view is NSTextView || view is NSPopUpButton || view is NSButton {
+        if !view.isHidden && (view is NSTextView || view is NSPopUpButton || view is NSButton) {
             controls.append(view)
         }
         for subview in view.subviews {
             controls.append(contentsOf: interactiveControls(in: subview))
         }
         return controls
+    }
+
+    private func buttons(in view: NSView) -> [NSButton] {
+        var matches: [NSButton] = []
+        if let button = view as? NSButton {
+            matches.append(button)
+        }
+        for subview in view.subviews {
+            matches.append(contentsOf: buttons(in: subview))
+        }
+        return matches
     }
 
     private func textLabels(in view: NSView) -> [NSTextField] {
