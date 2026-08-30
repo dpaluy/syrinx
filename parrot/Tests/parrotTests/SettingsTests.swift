@@ -129,6 +129,65 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(LiteralReplacementSettingsText.decode(encoded), replacements)
     }
 
+    func testReplacementSettingsTextRoundTripsLeadingAndTrailingWhitespace() {
+        let replacements = [
+            LiteralReplacement(match: " filler", replacement: ""),
+            LiteralReplacement(match: "hello ", replacement: " hi"),
+            LiteralReplacement(match: "lead", replacement: "trail "),
+        ]
+
+        let encoded = LiteralReplacementSettingsText.encode(replacements)
+
+        XCTAssertEqual(
+            encoded,
+            " filler => \nhello  =>  hi\nlead => trail "
+        )
+        XCTAssertEqual(LiteralReplacementSettingsText.decode(encoded), replacements)
+    }
+
+    func testDecodedLeadingSpaceRemovalRuleAppliesWithAndWithoutTrailingSpace() {
+        let replacements = LiteralReplacementSettingsText.decode(" filler => ")
+
+        XCTAssertEqual(
+            replacements,
+            [LiteralReplacement(match: " filler", replacement: "")]
+        )
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: "remove filler",
+                addTrailingSpace: false,
+                literalReplacements: replacements
+            ),
+            "remove"
+        )
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: "remove filler",
+                addTrailingSpace: true,
+                literalReplacements: replacements
+            ),
+            "remove "
+        )
+    }
+
+    func testEmptyMatchEditorLinesAreRejectedWithoutDisablingValidTransformations() {
+        let replacements = LiteralReplacementSettingsText.decode("hello => hi\n => invalid")
+
+        XCTAssertEqual(
+            replacements,
+            [LiteralReplacement(match: "hello", replacement: "hi")]
+        )
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: "hello comma world period",
+                addTrailingSpace: false,
+                literalReplacements: replacements,
+                spokenPunctuationEnabled: true
+            ),
+            "hi, world."
+        )
+    }
+
     func testInvalidEmptyMatchFailsOpenToOriginalSanitizedTranscript() {
         XCTAssertEqual(
             TextOutputPolicy.output(

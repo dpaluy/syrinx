@@ -46,23 +46,26 @@ public enum HotkeyChoice: String, CaseIterable, Codable, Sendable {
 }
 
 enum LiteralReplacementSettingsText {
+    private static let separator = " => "
+
     static func encode(_ replacements: [LiteralReplacement]) -> String {
         replacements
-            .map { "\($0.match) => \($0.replacement)" }
+            .map { "\($0.match)\(separator)\($0.replacement)" }
             .joined(separator: "\n")
     }
 
     static func decode(_ text: String) -> [LiteralReplacement] {
         text.components(separatedBy: .newlines).compactMap { line in
             guard !line.trimmingCharacters(in: .whitespaces).isEmpty,
-                  let separator = line.range(of: "=>")
+                  let separator = line.range(of: Self.separator)
             else {
                 return nil
             }
-            let match = line[..<separator.lowerBound]
-                .trimmingCharacters(in: .whitespaces)
-            let replacement = line[separator.upperBound...]
-                .trimmingCharacters(in: .whitespaces)
+            let match = String(line[..<separator.lowerBound])
+            let replacement = String(line[separator.upperBound...])
+            guard !match.isEmpty else {
+                return nil
+            }
             return LiteralReplacement(match: match, replacement: replacement)
         }
     }

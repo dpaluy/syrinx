@@ -67,6 +67,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         state.refreshPreferences()
         let status = loginItemController.refresh()
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
+        loadReplacementsText()
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -233,11 +234,8 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private func refreshUI() {
         trailingSpaceCheckbox.state = state.preferences.addTrailingSpace ? .on : .off
         spokenPunctuationCheckbox.state = state.preferences.spokenPunctuationEnabled ? .on : .off
-        let replacementsText = LiteralReplacementSettingsText.encode(
-            state.preferences.literalReplacements
-        )
-        if replacementsTextView.string != replacementsText {
-            replacementsTextView.string = replacementsText
+        if !isEditingReplacements {
+            loadReplacementsText()
         }
         hotkeyPopup.selectItem(withTitle: state.hotkeyChoice.displayName)
         hotkeyPopup.isEnabled = state.hotkeyChangeAllowed
@@ -259,6 +257,19 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
             modelProgress.startAnimation(nil)
         } else {
             modelProgress.stopAnimation(nil)
+        }
+    }
+
+    private var isEditingReplacements: Bool {
+        replacementsTextView.window?.firstResponder === replacementsTextView
+    }
+
+    private func loadReplacementsText() {
+        let replacementsText = LiteralReplacementSettingsText.encode(
+            state.preferences.literalReplacements
+        )
+        if replacementsTextView.string != replacementsText {
+            replacementsTextView.string = replacementsText
         }
     }
 }
