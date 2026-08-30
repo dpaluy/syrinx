@@ -70,7 +70,6 @@ public enum TextOutputPolicy {
     /// Returns nil when the processed transcript is empty or punctuation-only.
     public static func output(
         for text: String,
-        addTrailingSpace: Bool,
         literalReplacements: [LiteralReplacement] = [],
         spokenPunctuationEnabled: Bool = false
     ) -> String? {
@@ -90,7 +89,7 @@ public enum TextOutputPolicy {
         guard transformed.unicodeScalars.contains(where: { !ignoredCharacters.contains($0) }) else {
             return nil
         }
-        return addTrailingSpace ? transformed + " " : transformed
+        return transformed
     }
 
     private static func transform(
@@ -143,13 +142,5 @@ public enum TextOutputPolicy {
         }
         transformed = transformed.replacingOccurrences(of: " \n", with: "\n")
         return transformed.replacingOccurrences(of: "\n ", with: "\n")
-    }
-
-    public static func apply(to text: String, addTrailingSpace: Bool) -> String? {
-        output(for: text, addTrailingSpace: addTrailingSpace)
-    }
-
-    public static func apply(_ text: String, addTrailingSpace: Bool) -> String? {
-        output(for: text, addTrailingSpace: addTrailingSpace)
     }
 }

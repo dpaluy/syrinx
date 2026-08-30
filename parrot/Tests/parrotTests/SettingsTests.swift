@@ -21,7 +21,6 @@ final class SettingsTests: XCTestCase {
     func testPreferencesUseSafeDefaultsAndPersistTypedValues() {
         let preferences = AppPreferences(defaults: defaults)
 
-        XCTAssertTrue(preferences.addTrailingSpace)
         XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
         XCTAssertEqual(preferences.textOutputMode, .directTyping)
         XCTAssertNil(preferences.selectedModelID)
@@ -32,7 +31,6 @@ final class SettingsTests: XCTestCase {
             LiteralReplacement(match: "syrinks", replacement: "Syrinx"),
             LiteralReplacement(match: "git hub", replacement: "GitHub"),
         ]
-        preferences.addTrailingSpace = false
         preferences.hotkeyChoice = .rightOption
         preferences.textOutputMode = .clipboardPaste
         preferences.selectedModelID = "whisper-small.en"
@@ -40,7 +38,6 @@ final class SettingsTests: XCTestCase {
         preferences.literalReplacements = replacements
 
         let reloaded = AppPreferences(defaults: defaults)
-        XCTAssertFalse(reloaded.addTrailingSpace)
         XCTAssertEqual(reloaded.hotkeyChoice, .rightOption)
         XCTAssertEqual(reloaded.textOutputMode, .clipboardPaste)
         XCTAssertEqual(reloaded.selectedModelID, "whisper-small.en")
@@ -57,6 +54,14 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(preferences.textOutputMode, .directTyping)
     }
 
+    func testPreferencesRemoveObsoleteTrailingSpaceValue() {
+        defaults.set(false, forKey: "Syrinx.addTrailingSpace")
+
+        _ = AppPreferences(defaults: defaults)
+
+        XCTAssertNil(defaults.object(forKey: "Syrinx.addTrailingSpace"))
+    }
+
     func testTextOutputModesHaveExplicitUserFacingNames() {
         XCTAssertEqual(TextOutputMode.allCases.map(\.displayName), [
             "Direct typing",
@@ -70,27 +75,27 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(UtteranceAcceptancePolicy.accepts(sampleCount: 4_800))
     }
 
-    func testTextOutputPolicySanitizesAndAddsOneAsciiSpaceOnlyWhenEnabled() {
+    func testTextOutputPolicySanitizesWithoutAddingTrailingSpace() {
         XCTAssertEqual(
-            TextOutputPolicy.output(for: "  hello   world  ", addTrailingSpace: true),
-            "hello world "
+            TextOutputPolicy.output(for: "  hello   world  "),
+            "hello world"
         )
         XCTAssertEqual(
-            TextOutputPolicy.output(for: "hello.  ", addTrailingSpace: true),
-            "hello. "
+            TextOutputPolicy.output(for: "hello.  "),
+            "hello."
         )
         XCTAssertEqual(
-            TextOutputPolicy.output(for: "[BLANK_AUDIO] (silence) hello", addTrailingSpace: false),
+            TextOutputPolicy.output(for: "[BLANK_AUDIO] (silence) hello"),
             "hello"
         )
-        XCTAssertNil(TextOutputPolicy.output(for: " [MUSIC] ", addTrailingSpace: true))
+        XCTAssertNil(TextOutputPolicy.output(for: " [MUSIC] "))
     }
 
     func testTextOutputPolicySuppressesPunctuationOnlySanitizedResults() {
-        XCTAssertNil(TextOutputPolicy.output(for: "...!?", addTrailingSpace: false))
-        XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO] — (silence)", addTrailingSpace: true))
+        XCTAssertNil(TextOutputPolicy.output(for: "...!?"))
+        XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO] — (silence)"))
         XCTAssertEqual(
-            TextOutputPolicy.output(for: "Hello, world!", addTrailingSpace: false),
+            TextOutputPolicy.output(for: "Hello, world!"),
             "Hello, world!"
         )
     }
@@ -104,7 +109,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: "Use Syrinx",
-                addTrailingSpace: false,
                 literalReplacements: replacements
             ),
             "Use Syrinx for Mac"
@@ -115,7 +119,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: "Hello comma world period",
-                addTrailingSpace: false,
                 spokenPunctuationEnabled: true
             ),
             "Hello, world."
@@ -126,7 +129,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: "remove filler",
-                addTrailingSpace: false,
                 literalReplacements: [LiteralReplacement(match: " filler", replacement: "")]
             ),
             "remove"
@@ -161,7 +163,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(LiteralReplacementSettingsText.decode(encoded), replacements)
     }
 
-    func testDecodedLeadingSpaceRemovalRuleAppliesWithAndWithoutTrailingSpace() {
+    func testDecodedLeadingSpaceRemovalRuleApplies() {
         let replacements = LiteralReplacementSettingsText.decode(" filler => ")
 
         XCTAssertEqual(
@@ -171,18 +173,9 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: "remove filler",
-                addTrailingSpace: false,
                 literalReplacements: replacements
             ),
             "remove"
-        )
-        XCTAssertEqual(
-            TextOutputPolicy.output(
-                for: "remove filler",
-                addTrailingSpace: true,
-                literalReplacements: replacements
-            ),
-            "remove "
         )
     }
 
@@ -196,7 +189,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: "hello comma world period",
-                addTrailingSpace: false,
                 literalReplacements: replacements,
                 spokenPunctuationEnabled: true
             ),
@@ -208,20 +200,19 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: " [MUSIC] Hello period ",
-                addTrailingSpace: true,
                 literalReplacements: [LiteralReplacement(match: "", replacement: "invalid")],
                 spokenPunctuationEnabled: true
             ),
-            "Hello period "
+            "Hello period"
         )
     }
 
     func testDisabledTransformationsPreserveExistingOutputBehavior() {
         XCTAssertEqual(
-            TextOutputPolicy.output(for: "Hello comma world period", addTrailingSpace: true),
-            "Hello comma world period "
+            TextOutputPolicy.output(for: "Hello comma world period"),
+            "Hello comma world period"
         )
-        XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO]", addTrailingSpace: false))
+        XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO]"))
     }
 
     func testHotkeyChoicesHaveStableNamesAndModifierPolicies() {

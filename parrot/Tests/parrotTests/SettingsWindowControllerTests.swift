@@ -37,7 +37,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         let controls = interactiveControls(in: contentView)
 
         XCTAssertGreaterThanOrEqual(contentView.bounds.height, 540)
-        XCTAssertEqual(controls.count, 7)
+        XCTAssertEqual(controls.count, 6)
         for control in controls {
             let frame = control.convert(control.bounds, to: contentView)
             XCTAssertGreaterThan(frame.width, 0, "Expected usable width for \(control)")

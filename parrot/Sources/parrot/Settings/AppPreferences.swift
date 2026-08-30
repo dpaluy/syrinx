@@ -87,8 +87,9 @@ enum LiteralReplacementSettingsText {
 
 /// User preferences that affect the packaged Syrinx app at runtime.
 public final class AppPreferences {
+    private static let obsoleteAddTrailingSpaceKey = "Syrinx.addTrailingSpace"
+
     public enum Keys {
-        public static let addTrailingSpace = "Syrinx.addTrailingSpace"
         public static let hotkeyChoice = "Syrinx.hotkeyChoice"
         public static let textOutputMode = "Syrinx.textOutputMode"
         public static let selectedModelID = "Syrinx.selectedModelID"
@@ -100,24 +101,7 @@ public final class AppPreferences {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-    }
-
-    public var addTrailingSpace: Bool {
-        get {
-            guard let value = defaults.object(forKey: Keys.addTrailingSpace) as? Bool else {
-                return true
-            }
-            return value
-        }
-        set {
-            defaults.set(newValue, forKey: Keys.addTrailingSpace)
-        }
-    }
-
-    /// Alias that keeps the setting name clear at call sites.
-    public var trailingSpace: Bool {
-        get { addTrailingSpace }
-        set { addTrailingSpace = newValue }
+        defaults.removeObject(forKey: Self.obsoleteAddTrailingSpaceKey)
     }
 
     public var literalReplacements: [LiteralReplacement] {

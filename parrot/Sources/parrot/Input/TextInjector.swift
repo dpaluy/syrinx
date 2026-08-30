@@ -7,6 +7,43 @@ public protocol TextOutputting: AnyObject {
     func output(_ text: String)
 }
 
+/// Adds one separator when consecutive emitted texts form separate sentences.
+final class AutomaticSpacingTextOutput: TextOutputting {
+    private static let sentenceEndings: Set<Character> = [".", "?", "!", "…"]
+    private static let closingMarks: Set<Character> = ["\"", "'", "”", "’", ")", "]", "}"]
+    private static let openingMarks: Set<Character> = ["\"", "'", "“", "‘", "(", "[", "{"]
+
+    private let downstream: any TextOutputting
+    private var previousText: String?
+
+    init(output: any TextOutputting) {
+        self.downstream = output
+    }
+
+    func output(_ text: String) {
+        guard !text.isEmpty else { return }
+        let emitted = Self.needsSeparator(previous: previousText, next: text) ? " " + text : text
+        downstream.output(emitted)
+        previousText = emitted
+    }
+
+    private static func needsSeparator(previous: String?, next: String) -> Bool {
+        guard let previous,
+              previous.last?.isWhitespace != true,
+              next.first?.isWhitespace != true,
+              let previousContent = previous.reversed().first(where: { !closingMarks.contains($0) }),
+              sentenceEndings.contains(previousContent),
+              let nextContent = next.first(where: { !openingMarks.contains($0) })
+        else {
+            return false
+        }
+
+        return nextContent.unicodeScalars.contains {
+            CharacterSet.uppercaseLetters.contains($0) || CharacterSet.decimalDigits.contains($0)
+        }
+    }
+}
+
 /// Posts text at the current cursor by synthesizing Unicode keyboard events.
 /// Some Electron applications and secure fields can reject these events.
 public final class CGEventTextOutput: TextOutputting {

@@ -107,7 +107,9 @@ public final class DictationSession {
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
-        self.textOutput = ConfiguredTextOutput(preferences: preferences)
+        self.textOutput = AutomaticSpacingTextOutput(
+            output: ConfiguredTextOutput(preferences: preferences)
+        )
         self.copyText = ClipboardText.copy
         self.recordingLimitWait = { try await Task.sleep(for: $0) }
         self.loginItemController = LoginItemController()
@@ -167,7 +169,9 @@ public final class DictationSession {
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
-        self.textOutput = textOutput ?? ConfiguredTextOutput(preferences: preferences)
+        self.textOutput = AutomaticSpacingTextOutput(
+            output: textOutput ?? ConfiguredTextOutput(preferences: preferences)
+        )
         self.copyText = copyText
         self.recordingLimitWait = recordingLimitWait
         self.loginItemController = loginItemController
@@ -505,7 +509,6 @@ public final class DictationSession {
         guard !transcript.isEmpty,
               let output = TextOutputPolicy.output(
                   for: transcript,
-                  addTrailingSpace: preferences.addTrailingSpace,
                   literalReplacements: preferences.literalReplacements,
                   spokenPunctuationEnabled: preferences.spokenPunctuationEnabled
               )

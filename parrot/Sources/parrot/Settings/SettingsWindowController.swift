@@ -8,11 +8,6 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let onModelChanged: (TranscriptionModel) -> Void
     private let activeScreenVisibleFrame: () -> NSRect?
 
-    private let trailingSpaceCheckbox = NSButton(
-        checkboxWithTitle: "Add a space after dictation",
-        target: nil,
-        action: nil
-    )
     private let spokenPunctuationCheckbox = NSButton(
         checkboxWithTitle: "Convert spoken punctuation",
         target: nil,
@@ -102,11 +97,6 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         window.setFrameOrigin(origin)
     }
 
-    @objc private func trailingSpaceChanged(_ sender: NSButton) {
-        state.preferences.addTrailingSpace = sender.state == .on
-        refreshUI()
-    }
-
     @objc private func spokenPunctuationChanged(_ sender: NSButton) {
         state.preferences.spokenPunctuationEnabled = sender.state == .on
         refreshUI()
@@ -167,9 +157,6 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     }
 
     private func configureControls() {
-        trailingSpaceCheckbox.target = self
-        trailingSpaceCheckbox.action = #selector(trailingSpaceChanged(_:))
-
         spokenPunctuationCheckbox.target = self
         spokenPunctuationCheckbox.action = #selector(spokenPunctuationChanged(_:))
 
@@ -249,7 +236,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         let sections = [
             makeSection(
                 title: "Dictation behavior",
-                views: [trailingSpaceCheckbox, spokenPunctuationCheckbox]
+                views: [spokenPunctuationCheckbox]
             ),
             makeSection(
                 title: "Replacements",
@@ -351,7 +338,6 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     }
 
     private func refreshUI() {
-        trailingSpaceCheckbox.state = state.preferences.addTrailingSpace ? .on : .off
         spokenPunctuationCheckbox.state = state.preferences.spokenPunctuationEnabled ? .on : .off
         if !isEditingReplacements {
             loadReplacementsText()

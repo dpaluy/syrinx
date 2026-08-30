@@ -43,7 +43,7 @@ final class TextOutputTests: XCTestCase {
         monitor.send(.released)
         await fulfillment(of: [delivered], timeout: 1)
 
-        XCTAssertEqual(output.values, ["hello world "])
+        XCTAssertEqual(output.values, ["hello world"])
         XCTAssertEqual(session.lastDictation, "hello world")
         XCTAssertTrue(session.copyLastDictation())
         XCTAssertEqual(copied.values, ["hello world"])
@@ -75,7 +75,7 @@ final class TextOutputTests: XCTestCase {
         monitor.send(.released)
         await fulfillment(of: [delivered], timeout: 1)
 
-        XCTAssertEqual(output.values, ["Use Syrinx, world. "])
+        XCTAssertEqual(output.values, ["Use Syrinx, world."])
     }
 
     func testConfiguredOutputNeverUsesClipboardWhenDirectTypingIsSelected() {
@@ -93,6 +93,73 @@ final class TextOutputTests: XCTestCase {
 
         XCTAssertEqual(direct.values, ["private text"])
         XCTAssertTrue(paste.values.isEmpty)
+    }
+
+    func testAutomaticSpacingSeparatesConsecutiveSentencesForDirectTyping() {
+        let direct = RecordingTextOutput()
+        let paste = RecordingTextOutput()
+        let output = makeAutomaticOutput(direct: direct, paste: paste)
+
+        output.output("First sentence.")
+        output.output("Second sentence.")
+
+        XCTAssertEqual(direct.values, ["First sentence.", " Second sentence."])
+        XCTAssertTrue(paste.values.isEmpty)
+    }
+
+    func testAutomaticSpacingSeparatesConsecutiveSentencesForClipboardPaste() {
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.textOutputMode = .clipboardPaste
+        let direct = RecordingTextOutput()
+        let paste = RecordingTextOutput()
+        let output = AutomaticSpacingTextOutput(
+            output: ConfiguredTextOutput(preferences: preferences, direct: direct, paste: paste)
+        )
+
+        output.output("First sentence!")
+        output.output("Second sentence?")
+
+        XCTAssertTrue(direct.values.isEmpty)
+        XCTAssertEqual(paste.values, ["First sentence!", " Second sentence?"])
+    }
+
+    func testAutomaticSpacingDoesNotAddSpaceWhenWhitespaceExists() {
+        let direct = RecordingTextOutput()
+        let output = AutomaticSpacingTextOutput(output: direct)
+
+        output.output("First sentence. ")
+        output.output("Second sentence.")
+        output.output("Third sentence!")
+        output.output(" Fourth sentence?")
+
+        XCTAssertEqual(
+            direct.values,
+            ["First sentence. ", "Second sentence.", " Third sentence!", " Fourth sentence?"]
+        )
+    }
+
+    func testAutomaticSpacingRecognizesSentencePunctuationBeforeClosingMarks() {
+        let direct = RecordingTextOutput()
+        let output = AutomaticSpacingTextOutput(output: direct)
+
+        output.output(#"She said, "Stop!""#)
+        output.output(#""Then she left.""#)
+
+        XCTAssertEqual(direct.values, [#"She said, "Stop!""#, #" "Then she left.""#])
+    }
+
+    func testAutomaticSpacingDoesNotSeparateTextThatContinuesCurrentSentence() {
+        let direct = RecordingTextOutput()
+        let output = AutomaticSpacingTextOutput(output: direct)
+
+        output.output("This thought")
+        output.output("continues here.")
+        output.output("and this continues the same sentence")
+
+        XCTAssertEqual(
+            direct.values,
+            ["This thought", "continues here.", "and this continues the same sentence"]
+        )
     }
 
     func testPasteOutputRestoresEveryPasteboardRepresentation() throws {
@@ -203,6 +270,17 @@ final class TextOutputTests: XCTestCase {
             menuBar: MenuBarController(modelID: TextOutputTestModel.model.id),
             textOutput: textOutput,
             copyText: copyText
+        )
+    }
+
+    private func makeAutomaticOutput(
+        direct: any TextOutputting,
+        paste: any TextOutputting
+    ) -> AutomaticSpacingTextOutput {
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.textOutputMode = .directTyping
+        return AutomaticSpacingTextOutput(
+            output: ConfiguredTextOutput(preferences: preferences, direct: direct, paste: paste)
         )
     }
 }

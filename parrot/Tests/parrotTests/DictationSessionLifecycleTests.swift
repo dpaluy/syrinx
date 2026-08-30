@@ -66,12 +66,12 @@ final class DictationSessionLifecycleTests: XCTestCase {
         let secondStarted = await waitUntil { await transcriber.callCount == 2 }
         XCTAssertTrue(secondStarted)
         await transcriber.resolve(call: 1, with: "new result")
-        let newResultDelivered = await waitUntil { output.values == ["new result "] }
+        let newResultDelivered = await waitUntil { output.values == ["new result"] }
         XCTAssertTrue(newResultDelivered)
         await transcriber.resolve(call: 0, with: "old result")
         try await Task.sleep(for: .milliseconds(30))
 
-        XCTAssertEqual(output.values, ["new result "])
+        XCTAssertEqual(output.values, ["new result"])
         XCTAssertEqual(session.lastDictation, "new result")
         XCTAssertEqual(session.phase, .idle)
     }
@@ -103,7 +103,7 @@ final class DictationSessionLifecycleTests: XCTestCase {
         let transcriptionStarted = await waitUntil { await transcriber.callCount == 1 }
         XCTAssertTrue(transcriptionStarted)
         monitor.send(.released)
-        let resultDelivered = await waitUntil { output.values == ["limited "] }
+        let resultDelivered = await waitUntil { output.values == ["limited"] }
         XCTAssertTrue(resultDelivered)
         try await Task.sleep(for: .milliseconds(30))
 
