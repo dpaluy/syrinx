@@ -274,6 +274,8 @@ public final class DictationSession {
 
     private func handle(_ event: HotkeyMonitor.Event) {
         switch event {
+        case .monitoringFailed:
+            menuBar.setStatus("shortcut unavailable")
         case .pressed:
             do {
                 try capture.start()
