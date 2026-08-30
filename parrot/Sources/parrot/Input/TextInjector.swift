@@ -93,7 +93,13 @@ public final class ClipboardPasteTextOutput: TextOutputting {
         guard !text.isEmpty else { return }
         restoreGeneration &+= 1
         let generation = restoreGeneration
-        let snapshot = pendingRestore?.snapshot ?? PasteboardSnapshot(pasteboard: pasteboard)
+        let snapshot: PasteboardSnapshot
+        if let pendingRestore,
+           pasteboard.changeCount == pendingRestore.changeCount {
+            snapshot = pendingRestore.snapshot
+        } else {
+            snapshot = PasteboardSnapshot(pasteboard: pasteboard)
+        }
         pasteboard.clearContents()
         guard pasteboard.setString(text, forType: .string) else {
             pendingRestore = nil

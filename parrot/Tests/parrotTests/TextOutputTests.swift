@@ -115,6 +115,28 @@ final class TextOutputTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), "original")
     }
 
+    func testOverlappingPasteOutputsRestoreClipboardChangedByAnotherOwner() {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("SyrinxPasteTests.\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        pasteboard.setString("original", forType: .string)
+        var restorations: [() -> Void] = []
+        let output = ClipboardPasteTextOutput(
+            pasteboard: pasteboard,
+            pasteAction: {},
+            scheduleRestore: { restorations.append($0) }
+        )
+
+        output.output("first")
+        pasteboard.clearContents()
+        pasteboard.setString("new owner", forType: .string)
+        output.output("second")
+
+        restorations[0]()
+        restorations[1]()
+
+        XCTAssertEqual(pasteboard.string(forType: .string), "new owner")
+    }
+
     func testPasteOutputDoesNotOverwriteAClipboardChangeMadeAfterPaste() {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("SyrinxPasteTests.\(UUID().uuidString)"))
         pasteboard.clearContents()
