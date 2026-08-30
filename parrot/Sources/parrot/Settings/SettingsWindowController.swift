@@ -46,7 +46,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         self.onModelChanged = onModelChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 430),
+            contentRect: NSRect(x: 0, y: 0, width: 430, height: 540),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -72,7 +72,6 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         let status = loginItemController.refresh()
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
         refreshUI()
-        loadReplacementsText()
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
