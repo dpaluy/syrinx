@@ -46,12 +46,13 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         self.onModelChanged = onModelChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 540),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 720),
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Syrinx Settings"
+        window.contentMinSize = NSSize(width: 520, height: 480)
         window.isReleasedWhenClosed = false
         super.init(window: window)
 
@@ -156,6 +157,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         replacementsTextView.isAutomaticSpellingCorrectionEnabled = false
         replacementsTextView.isHorizontallyResizable = false
         replacementsTextView.isVerticallyResizable = true
+        replacementsTextView.textContainerInset = NSSize(width: 6, height: 6)
         replacementsTextView.textContainer?.widthTracksTextView = true
         replacementsScrollView.borderType = .bezelBorder
         replacementsScrollView.hasVerticalScroller = true
@@ -176,16 +178,19 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged(_:))
 
-        for label in [versionLabel, modelStateLabel, loginItemStatusLabel] {
+        for label in [versionLabel, loginItemStatusLabel] {
             label.alignment = .left
             label.lineBreakMode = .byTruncatingTail
         }
-        loginItemErrorLabel.alignment = .left
+        loginItemStatusLabel.textColor = .secondaryLabelColor
+        for label in [loginItemErrorLabel, shortcutErrorLabel, modelStateLabel] {
+            label.alignment = .left
+            label.lineBreakMode = .byWordWrapping
+            label.maximumNumberOfLines = 0
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
         loginItemErrorLabel.textColor = .systemRed
-        loginItemErrorLabel.lineBreakMode = .byTruncatingTail
-        shortcutErrorLabel.alignment = .left
         shortcutErrorLabel.textColor = .systemRed
-        shortcutErrorLabel.lineBreakMode = .byTruncatingTail
         modelProgress.isIndeterminate = true
         modelProgress.controlSize = .small
         modelProgress.isDisplayedWhenStopped = false
@@ -194,35 +199,15 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private func configureLayout() {
         guard let contentView = window?.contentView else { return }
 
-        let settingsHeader = NSTextField(labelWithString: "Settings")
-        settingsHeader.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
-
-        let replacementsLabel = NSTextField(labelWithString: "Literal replacements")
         let replacementsHelp = NSTextField(
-            wrappingLabelWithString: "Use one line for each replacement: spoken form => replacement"
+            wrappingLabelWithString: "Add one replacement per line. Use spoken form => replacement."
         )
         replacementsHelp.textColor = .secondaryLabelColor
         replacementsHelp.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        replacementsHelp.maximumNumberOfLines = 0
 
-        let shortcutRow = NSStackView(views: [
-            NSTextField(labelWithString: "Hold shortcut"),
-            hotkeyPopup,
-        ])
-        shortcutRow.orientation = .horizontal
-        shortcutRow.spacing = 12
-        shortcutRow.alignment = .centerY
-        shortcutRow.distribution = .fill
-        hotkeyPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-        let outputModeRow = NSStackView(views: [
-            NSTextField(labelWithString: "Text output"),
-            outputModePopup,
-        ])
-        outputModeRow.orientation = .horizontal
-        outputModeRow.spacing = 12
-        outputModeRow.alignment = .centerY
-        outputModeRow.distribution = .fill
-        outputModePopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let shortcutRow = makeFormRow(label: "Hold shortcut", control: hotkeyPopup)
+        let outputModeRow = makeFormRow(label: "Text output", control: outputModePopup)
 
         let loginRow = NSStackView(views: [launchAtLoginCheckbox, loginItemStatusLabel])
         loginRow.orientation = .horizontal
@@ -230,54 +215,103 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         loginRow.alignment = .centerY
         loginItemStatusLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let modelHeader = NSTextField(labelWithString: "Model")
-        modelHeader.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
         modelPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let modelStateRow = NSStackView(views: [modelStateLabel, modelProgress])
         modelStateRow.orientation = .horizontal
         modelStateRow.spacing = 8
-        modelStateRow.alignment = .centerY
+        modelStateRow.alignment = .top
         modelProgress.setContentHuggingPriority(.required, for: .horizontal)
 
         let stack = NSStackView(views: [
-            settingsHeader,
-            trailingSpaceCheckbox,
-            spokenPunctuationCheckbox,
-            replacementsLabel,
-            replacementsScrollView,
-            replacementsHelp,
-            shortcutRow,
-            shortcutErrorLabel,
-            outputModeRow,
-            loginRow,
-            loginItemErrorLabel,
-            NSView(),
-            versionLabel,
-            modelHeader,
-            modelPopup,
-            modelStateRow,
+            makeSection(
+                title: "Dictation behavior",
+                views: [trailingSpaceCheckbox, spokenPunctuationCheckbox]
+            ),
+            makeSection(
+                title: "Replacements",
+                views: [replacementsHelp, replacementsScrollView]
+            ),
+            makeSection(
+                title: "Shortcut and output",
+                views: [shortcutRow, shortcutErrorLabel, outputModeRow]
+            ),
+            makeSection(
+                title: "Permissions and startup",
+                views: [loginRow, loginItemErrorLabel]
+            ),
+            makeSection(
+                title: "Model",
+                views: [modelPopup, modelStateRow]
+            ),
+            makeSection(title: "About", views: [versionLabel]),
         ])
         stack.orientation = .vertical
-        stack.spacing = 10
-        stack.alignment = .leading
+        stack.spacing = 24
+        stack.alignment = .width
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        contentView.addSubview(stack)
+        let documentView = NSView(frame: .zero)
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(stack)
+
+        let scrollView = NSScrollView(frame: .zero)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = documentView
+        contentView.addSubview(scrollView)
+
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-            replacementsScrollView.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            replacementsScrollView.heightAnchor.constraint(equalToConstant: 64),
-            replacementsHelp.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            shortcutRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            outputModeRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            loginRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            modelPopup.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            modelStateRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
-            modelStateLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+            documentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.contentView.heightAnchor),
+
+            stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 28),
+            stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -28),
+            stack.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor, constant: -28),
+
+            replacementsScrollView.heightAnchor.constraint(equalToConstant: 120),
+            modelStateLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
         ])
+    }
+
+    private func makeSection(title: String, views: [NSView]) -> NSStackView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+
+        let content = NSStackView(views: views)
+        content.orientation = .vertical
+        content.spacing = 8
+        content.alignment = .width
+
+        let section = NSStackView(views: [titleLabel, content])
+        section.orientation = .vertical
+        section.spacing = 10
+        section.alignment = .width
+        return section
+    }
+
+    private func makeFormRow(label: String, control: NSView) -> NSStackView {
+        let labelView = NSTextField(labelWithString: label)
+        labelView.alignment = .right
+        labelView.widthAnchor.constraint(equalToConstant: 124).isActive = true
+        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let row = NSStackView(views: [labelView, control])
+        row.orientation = .horizontal
+        row.spacing = 12
+        row.alignment = .centerY
+        row.distribution = .fill
+        return row
     }
 
     private static func modelTitle(_ model: TranscriptionModel) -> String {
@@ -297,10 +331,13 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         launchAtLoginCheckbox.state = state.loginItemStatus == .enabled || state.loginItemStatus == .requiresApproval ? .on : .off
         loginItemStatusLabel.stringValue = state.loginItemStatus.displayText
         loginItemErrorLabel.stringValue = state.loginItemOperationError.map { "Error: \($0)" } ?? ""
+        loginItemErrorLabel.isHidden = state.loginItemOperationError == nil
         versionLabel.stringValue = "Version: \(state.appVersion)"
         modelPopup.selectItem(withTitle: Self.modelTitle(state.model))
+        modelPopup.toolTip = Self.modelTitle(state.model)
         modelPopup.isEnabled = state.modelChangeAllowed
         modelStateLabel.stringValue = state.modelState.displayText
+        shortcutErrorLabel.isHidden = state.shortcutError == nil
 
         if case .downloading(let progress) = state.modelState, let progress {
             modelProgress.isIndeterminate = false
