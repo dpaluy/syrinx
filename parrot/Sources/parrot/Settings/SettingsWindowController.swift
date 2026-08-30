@@ -6,6 +6,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let loginItemController: LoginItemController
     private let onHotkeyChoiceChanged: (HotkeyChoice) -> Bool
     private let onModelChanged: (TranscriptionModel) -> Void
+    private let activeScreenVisibleFrame: () -> NSRect?
 
     private let trailingSpaceCheckbox = NSButton(
         checkboxWithTitle: "Add a space after dictation",
@@ -38,12 +39,16 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         state: SettingsState,
         loginItemController: LoginItemController? = nil,
         onHotkeyChoiceChanged: @escaping (HotkeyChoice) -> Bool,
-        onModelChanged: @escaping (TranscriptionModel) -> Void = { _ in }
+        onModelChanged: @escaping (TranscriptionModel) -> Void = { _ in },
+        activeScreenVisibleFrame: @escaping () -> NSRect? = {
+            NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame
+        }
     ) {
         self.state = state
         self.loginItemController = loginItemController ?? LoginItemController()
         self.onHotkeyChoiceChanged = onHotkeyChoiceChanged
         self.onModelChanged = onModelChanged
+        self.activeScreenVisibleFrame = activeScreenVisibleFrame
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 430, height: 540),
@@ -72,9 +77,28 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         let status = loginItemController.refresh()
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
         refreshUI()
+        let visibleFrame = activeScreenVisibleFrame()
         showWindow(nil)
+        if let visibleFrame {
+            centerWindow(in: visibleFrame)
+        }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    private func centerWindow(in visibleFrame: NSRect) {
+        guard let window else { return }
+
+        let windowFrame = window.frame
+        let centeredX = visibleFrame.midX - (windowFrame.width / 2)
+        let centeredY = visibleFrame.midY - (windowFrame.height / 2)
+        let maximumX = max(visibleFrame.minX, visibleFrame.maxX - windowFrame.width)
+        let maximumY = max(visibleFrame.minY, visibleFrame.maxY - windowFrame.height)
+        let origin = NSPoint(
+            x: min(max(centeredX, visibleFrame.minX), maximumX),
+            y: min(max(centeredY, visibleFrame.minY), maximumY)
+        )
+        window.setFrameOrigin(origin)
     }
 
     @objc private func trailingSpaceChanged(_ sender: NSButton) {

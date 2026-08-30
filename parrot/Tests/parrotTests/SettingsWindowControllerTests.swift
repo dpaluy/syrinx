@@ -49,6 +49,32 @@ final class SettingsWindowControllerTests: XCTestCase {
         }
     }
 
+    func testShowSettingsCentersWindowInsideActiveScreenVisibleFrame() throws {
+        let visibleFrame = NSRect(x: 1_200, y: 80, width: 1_000, height: 800)
+        let controller = makeController(activeScreenVisibleFrame: { visibleFrame })
+
+        controller.showSettings()
+
+        let windowFrame = try XCTUnwrap(controller.window?.frame)
+        XCTAssertEqual(windowFrame.midX, visibleFrame.midX, accuracy: 0.5)
+        XCTAssertEqual(windowFrame.midY, visibleFrame.midY, accuracy: 0.5)
+        XCTAssertTrue(visibleFrame.contains(windowFrame))
+    }
+
+    func testShowSettingsAgainMovesExistingWindowToNewActiveScreen() throws {
+        var visibleFrame = NSRect(x: 0, y: 40, width: 1_000, height: 800)
+        let controller = makeController(activeScreenVisibleFrame: { visibleFrame })
+        controller.showSettings()
+
+        visibleFrame = NSRect(x: 1_200, y: 80, width: 1_000, height: 800)
+        controller.showSettings()
+
+        let windowFrame = try XCTUnwrap(controller.window?.frame)
+        XCTAssertEqual(windowFrame.midX, visibleFrame.midX, accuracy: 0.5)
+        XCTAssertEqual(windowFrame.midY, visibleFrame.midY, accuracy: 0.5)
+        XCTAssertTrue(visibleFrame.contains(windowFrame))
+    }
+
     func testShowSettingsAgainPreservesActiveReplacementDraftAndSelection() throws {
         let preferences = AppPreferences(defaults: defaults)
         preferences.literalReplacements = [
@@ -136,6 +162,19 @@ final class SettingsWindowControllerTests: XCTestCase {
         guard let contentView = window.contentView else { return nil }
         let textViews = collect(contentView)
         return textViews.count == 1 ? textViews[0] : nil
+    }
+
+    private func makeController(
+        activeScreenVisibleFrame: @escaping () -> NSRect?
+    ) -> SettingsWindowController {
+        let preferences = AppPreferences(defaults: defaults)
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        return SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in true },
+            activeScreenVisibleFrame: activeScreenVisibleFrame
+        )
     }
 }
 
