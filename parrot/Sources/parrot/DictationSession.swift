@@ -226,6 +226,7 @@ public final class DictationSession {
         let replacement = monitorFactory(choice)
         do {
             try register(replacement)
+            menuBar.clearFailure()
             monitor = replacement
             preferences.hotkeyChoice = choice
             workingHotkeyChoice = choice
@@ -238,6 +239,7 @@ public final class DictationSession {
             let restored = monitorFactory(previous)
             do {
                 try register(restored)
+                menuBar.clearFailure()
                 monitor = restored
                 preferences.hotkeyChoice = previous
                 workingHotkeyChoice = previous

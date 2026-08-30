@@ -101,6 +101,11 @@ public final class MenuBarController {
         renderState()
     }
 
+    internal func clearFailure() {
+        stickyError = nil
+        renderState()
+    }
+
     public func setModelState(_ state: ModelLifecycleState) {
         modelState = state
         renderState()
@@ -108,7 +113,6 @@ public final class MenuBarController {
 
     public func setHotkeyChoice(_ choice: HotkeyChoice) {
         hotkeyChoice = choice
-        stickyError = nil
         renderState()
     }
 

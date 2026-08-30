@@ -138,6 +138,35 @@ final class DictationSessionShortcutTests: XCTestCase {
         session.stop()
     }
 
+    func testSuccessfulShortcutReplacementClearsMonitoringFailure() async throws {
+        let factory = FakeHotkeyFactory()
+        let session = makeSession(factory: factory, preferences: AppPreferences(defaults: defaults))
+
+        try await session.prepare()
+        try session.start()
+        let original = try XCTUnwrap(factory.monitors.first)
+        original.emit(.monitoringFailed)
+        XCTAssertEqual(menuBar.statusTitleForTesting, "shortcut unavailable")
+
+        XCTAssertTrue(session.setHotkeyChoice(.rightOption))
+
+        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
+    }
+
+    func testFailedShortcutReplacementAndRestorationKeepMonitoringFailureVisible() async throws {
+        let factory = FakeHotkeyFactory(startFailurePlan: [false, true, true])
+        let session = makeSession(factory: factory, preferences: AppPreferences(defaults: defaults))
+
+        try await session.prepare()
+        try session.start()
+        let original = try XCTUnwrap(factory.monitors.first)
+        original.emit(.monitoringFailed)
+
+        XCTAssertFalse(session.setHotkeyChoice(.rightOption))
+
+        XCTAssertEqual(menuBar.statusTitleForTesting, "shortcut unavailable")
+    }
+
     func testMonitoringFailureRemainsVisibleAfterTranscriptionAndPersistsShortcutError() async throws {
         let factory = FakeHotkeyFactory()
         let preferences = AppPreferences(defaults: defaults)
@@ -185,11 +214,11 @@ final class DictationSessionShortcutTests: XCTestCase {
         menuBar.setRecording(false)
         XCTAssertEqual(menuBar.statusTitleForTesting, "shortcut unavailable")
 
+        menuBar.setHotkeyChoice(.rightOption)
+        XCTAssertEqual(menuBar.statusTitleForTesting, "shortcut unavailable")
+
         menuBar.setStarted(false)
         menuBar.setStarted(true)
-        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Fn or Globe to dictate")
-
-        menuBar.setHotkeyChoice(.rightOption)
         XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
 
         menuBar.setFailure("shortcut unavailable")
