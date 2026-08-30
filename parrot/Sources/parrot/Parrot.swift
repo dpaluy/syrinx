@@ -106,6 +106,11 @@ struct Run: ParsableCommand {
         do {
             try monitor.start { event in
                 switch event {
+                case .monitoringFailed:
+                    FileHandle.standardError.write(Data("hotkey tap recovery failed\n".utf8))
+                    MainActor.assumeIsolated {
+                        menuBar.setFailure("shortcut unavailable")
+                    }
                 case .pressed:
                     do {
                         try capture.start()

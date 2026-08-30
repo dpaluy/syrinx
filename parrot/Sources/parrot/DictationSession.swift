@@ -1,6 +1,15 @@
 import AppKit
 import Foundation
 
+internal protocol DictationAudioCapture: AnyObject {
+    var onLevel: ((Float) -> Void)? { get set }
+    func start() throws
+    @discardableResult
+    func stop() -> [Float]
+}
+
+extension AudioCapture: DictationAudioCapture {}
+
 @MainActor
 public final class DictationSession {
     public enum SessionError: Error {
@@ -13,7 +22,7 @@ public final class DictationSession {
     private let transcriber: any Transcriber
     private let monitorFactory: (HotkeyChoice) -> any HotkeyMonitoring
     private var monitor: any HotkeyMonitoring
-    private let capture: AudioCapture
+    private let capture: any DictationAudioCapture
     private let overlay: RecordingOverlay
     private let menuBar: MenuBarController
     private let preferences: AppPreferences
@@ -56,13 +65,14 @@ public final class DictationSession {
             transcriber = try TranscriberFactory.make(model: model)
         }
         let monitor = HotkeyMonitor(choice: preferences.hotkeyChoice)
+        let capture = AudioCapture()
         let menuBar = MenuBarController(modelID: model.id)
 
         self.model = model
         self.transcriber = transcriber
         self.monitorFactory = { HotkeyMonitor(choice: $0) }
         self.monitor = monitor
-        self.capture = AudioCapture()
+        self.capture = capture
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
@@ -88,7 +98,8 @@ public final class DictationSession {
         monitorFactory: @escaping (HotkeyChoice) -> any HotkeyMonitoring,
         preferences: AppPreferences = AppPreferences(),
         loginItemController: LoginItemController,
-        menuBar: MenuBarController
+        menuBar: MenuBarController,
+        capture: any DictationAudioCapture = AudioCapture()
     ) {
         let settingsState = SettingsState(
             model: model,
@@ -100,7 +111,7 @@ public final class DictationSession {
         self.transcriber = transcriber
         self.monitorFactory = monitorFactory
         self.monitor = monitorFactory(preferences.hotkeyChoice)
-        self.capture = AudioCapture()
+        self.capture = capture
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
@@ -215,6 +226,7 @@ public final class DictationSession {
         let replacement = monitorFactory(choice)
         do {
             try register(replacement)
+            menuBar.clearFailure()
             monitor = replacement
             preferences.hotkeyChoice = choice
             workingHotkeyChoice = choice
@@ -227,6 +239,7 @@ public final class DictationSession {
             let restored = monitorFactory(previous)
             do {
                 try register(restored)
+                menuBar.clearFailure()
                 monitor = restored
                 preferences.hotkeyChoice = previous
                 workingHotkeyChoice = previous
@@ -274,6 +287,9 @@ public final class DictationSession {
 
     private func handle(_ event: HotkeyMonitor.Event) {
         switch event {
+        case .monitoringFailed:
+            menuBar.setFailure("shortcut unavailable")
+            settingsState.setShortcutError("shortcut unavailable; restart Syrinx or re-select the hotkey")
         case .pressed:
             do {
                 try capture.start()
