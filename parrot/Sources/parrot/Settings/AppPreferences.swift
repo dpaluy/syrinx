@@ -1,47 +1,103 @@
 import CoreGraphics
 import Foundation
 
-/// The supported hold-to-record controls.
-public enum HotkeyChoice: String, CaseIterable, Codable, Sendable {
-    case fnOrGlobe = "fnOrGlobe"
-    case rightCommand = "rightCommand"
-    case rightOption = "rightOption"
+/// A user-recorded hold-to-record shortcut.
+public struct HotkeyChoice: Codable, Hashable, Sendable {
+    public let keyCode: CGKeyCode
+    public let keyLabel: String
+    public let isModifierOnly: Bool
+    private let requiredFlagsRawValue: UInt64
 
-    public static let defaultChoice: HotkeyChoice = .fnOrGlobe
+    public init(
+        keyCode: CGKeyCode,
+        requiredFlags: CGEventFlags,
+        keyLabel: String,
+        isModifierOnly: Bool = false
+    ) {
+        self.keyCode = keyCode
+        self.keyLabel = keyLabel
+        self.isModifierOnly = isModifierOnly
+        self.requiredFlagsRawValue = Self.normalized(requiredFlags).rawValue
+    }
+
+    public var requiredFlags: CGEventFlags {
+        Self.normalized(CGEventFlags(rawValue: requiredFlagsRawValue))
+    }
 
     public var displayName: String {
-        switch self {
-        case .fnOrGlobe:
-            return "Fn or Globe"
-        case .rightCommand:
-            return "Right Command"
-        case .rightOption:
-            return "Right Option"
+        if isModifierOnly {
+            return keyLabel
+        }
+        return Self.modifierSymbols(for: requiredFlags) + keyLabel
+    }
+
+    var isFunctionKey: Bool {
+        guard keyLabel.first == "F",
+              let number = Int(keyLabel.dropFirst())
+        else { return false }
+        return (1...35).contains(number)
+    }
+
+    func matches(_ eventFlags: CGEventFlags) -> Bool {
+        var eventFlags = Self.normalized(eventFlags)
+        if isFunctionKey, !requiredFlags.contains(.maskSecondaryFn) {
+            eventFlags.remove(.maskSecondaryFn)
+        }
+        return eventFlags == requiredFlags
+    }
+
+    public static let fnOrGlobe = HotkeyChoice(
+        keyCode: 63,
+        requiredFlags: .maskSecondaryFn,
+        keyLabel: "fn",
+        isModifierOnly: true
+    )
+    public static let rightCommand = HotkeyChoice(
+        keyCode: 54,
+        requiredFlags: .maskCommand,
+        keyLabel: "Right ⌘",
+        isModifierOnly: true
+    )
+    public static let rightOption = HotkeyChoice(
+        keyCode: 61,
+        requiredFlags: .maskAlternate,
+        keyLabel: "Right ⌥",
+        isModifierOnly: true
+    )
+    public static let defaultChoice: HotkeyChoice = .fnOrGlobe
+
+    /// Retained for callers that enumerate the original built-in choices.
+    public static let allCases: [HotkeyChoice] = [.fnOrGlobe, .rightCommand, .rightOption]
+
+    static func normalized(_ flags: CGEventFlags) -> CGEventFlags {
+        flags.intersection([
+            .maskControl,
+            .maskAlternate,
+            .maskShift,
+            .maskCommand,
+            .maskSecondaryFn,
+            .maskAlphaShift,
+        ])
+    }
+
+    static func legacyChoice(rawValue: String) -> HotkeyChoice? {
+        switch rawValue {
+        case "fnOrGlobe": return .fnOrGlobe
+        case "rightCommand": return .rightCommand
+        case "rightOption": return .rightOption
+        default: return nil
         }
     }
 
-    /// The physical key code emitted by macOS for this modifier key.
-    public var keyCode: CGKeyCode {
-        switch self {
-        case .fnOrGlobe:
-            return 63
-        case .rightCommand:
-            return 54
-        case .rightOption:
-            return 61
-        }
-    }
-
-    /// The modifier flag that must be present for this key to be held.
-    public var requiredFlags: CGEventFlags {
-        switch self {
-        case .fnOrGlobe:
-            return .maskSecondaryFn
-        case .rightCommand:
-            return .maskCommand
-        case .rightOption:
-            return .maskAlternate
-        }
+    private static func modifierSymbols(for flags: CGEventFlags) -> String {
+        var result = ""
+        if flags.contains(.maskControl) { result += "⌃" }
+        if flags.contains(.maskAlternate) { result += "⌥" }
+        if flags.contains(.maskShift) { result += "⇧" }
+        if flags.contains(.maskCommand) { result += "⌘" }
+        if flags.contains(.maskSecondaryFn) { result += "fn " }
+        if flags.contains(.maskAlphaShift) { result += "⇪" }
+        return result
     }
 }
 
@@ -136,15 +192,19 @@ public final class AppPreferences {
 
     public var hotkeyChoice: HotkeyChoice {
         get {
-            guard let rawValue = defaults.string(forKey: Keys.hotkeyChoice),
-                  let choice = HotkeyChoice(rawValue: rawValue)
-            else {
-                return .defaultChoice
+            if let data = defaults.data(forKey: Keys.hotkeyChoice),
+               let choice = try? JSONDecoder().decode(HotkeyChoice.self, from: data) {
+                return choice
             }
-            return choice
+            if let rawValue = defaults.string(forKey: Keys.hotkeyChoice),
+               let choice = HotkeyChoice.legacyChoice(rawValue: rawValue) {
+                return choice
+            }
+            return .defaultChoice
         }
         set {
-            defaults.set(newValue.rawValue, forKey: Keys.hotkeyChoice)
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            defaults.set(data, forKey: Keys.hotkeyChoice)
         }
     }
 

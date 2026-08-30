@@ -436,11 +436,14 @@ public final class DictationSession {
             menuBar.setFailure("shortcut unavailable")
             settingsState.setShortcutError("shortcut unavailable; restart Syrinx or re-select the hotkey")
         case .pressed:
+            guard !settingsState.shortcutRecordingActive else { return }
             beginRecording()
         case .released:
+            guard !settingsState.shortcutRecordingActive else { return }
             guard phase == .recording else { return }
             finishRecording(token: sessionToken)
         case .cancel:
+            guard !settingsState.shortcutRecordingActive else { return }
             cancel()
         }
     }

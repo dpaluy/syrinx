@@ -15,7 +15,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     )
     private let replacementsTextView = NSTextView(frame: .zero)
     private let replacementsScrollView = NSScrollView(frame: .zero)
-    private let hotkeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let shortcutButton = ShortcutRecorderButton()
     private let outputModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let launchAtLoginCheckbox = NSButton(
         checkboxWithTitle: "Launch at login",
@@ -55,6 +55,12 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         window.contentMinSize = NSSize(width: 520, height: 480)
         window.isReleasedWhenClosed = false
         super.init(window: window)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(settingsWindowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: window
+        )
 
         configureControls()
         configureLayout()
@@ -66,6 +72,10 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
 
     public required init?(coder: NSCoder) {
         fatalError("SettingsWindowController does not support storyboards")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     public func showSettings() {
@@ -109,24 +119,6 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         )
     }
 
-    @objc private func hotkeyChanged(_ sender: NSPopUpButton) {
-        guard state.hotkeyChangeAllowed,
-              sender.indexOfSelectedItem >= 0,
-              sender.indexOfSelectedItem < HotkeyChoice.allCases.count
-        else {
-            refreshUI()
-            return
-        }
-
-        let choice = HotkeyChoice.allCases[sender.indexOfSelectedItem]
-        guard onHotkeyChoiceChanged(choice) else {
-            refreshUI()
-            return
-        }
-        state.setHotkeyChoice(choice)
-        refreshUI()
-    }
-
     @objc private func outputModeChanged(_ sender: NSPopUpButton) {
         guard sender.indexOfSelectedItem >= 0,
               sender.indexOfSelectedItem < TextOutputMode.allCases.count
@@ -156,6 +148,10 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         refreshUI()
     }
 
+    @objc private func settingsWindowWillClose(_ notification: Notification) {
+        shortcutButton.cancelRecording()
+    }
+
     private func configureControls() {
         spokenPunctuationCheckbox.target = self
         spokenPunctuationCheckbox.action = #selector(spokenPunctuationChanged(_:))
@@ -174,9 +170,23 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         replacementsScrollView.hasVerticalScroller = true
         replacementsScrollView.documentView = replacementsTextView
 
-        hotkeyPopup.addItems(withTitles: HotkeyChoice.allCases.map(\.displayName))
-        hotkeyPopup.target = self
-        hotkeyPopup.action = #selector(hotkeyChanged(_:))
+        shortcutButton.setShortcut(state.hotkeyChoice)
+        shortcutButton.onRecordingChanged = { [weak state] active in
+            state?.setShortcutRecordingActive(active)
+        }
+        shortcutButton.onShortcutRecorded = { [weak self] choice in
+            guard let self,
+                  self.state.hotkeyChangeAllowed,
+                  self.onHotkeyChoiceChanged(choice)
+            else {
+                self?.refreshUI()
+                return false
+            }
+            self.state.preferences.hotkeyChoice = choice
+            self.state.setHotkeyChoice(choice)
+            self.refreshUI()
+            return true
+        }
 
         outputModePopup.addItems(withTitles: TextOutputMode.allCases.map(\.displayName))
         outputModePopup.target = self
@@ -217,7 +227,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         replacementsHelp.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         replacementsHelp.maximumNumberOfLines = 0
 
-        let shortcutRow = makeFormRow(label: "Hold shortcut", control: hotkeyPopup)
+        let shortcutRow = makeFormRow(label: "Hold shortcut", control: shortcutButton)
         let outputModeRow = makeFormRow(label: "Text output", control: outputModePopup)
 
         let loginRow = NSStackView(views: [launchAtLoginCheckbox, loginItemStatusLabel])
@@ -342,8 +352,11 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         if !isEditingReplacements {
             loadReplacementsText()
         }
-        hotkeyPopup.selectItem(withTitle: state.hotkeyChoice.displayName)
-        hotkeyPopup.isEnabled = state.hotkeyChangeAllowed
+        shortcutButton.setShortcut(state.hotkeyChoice)
+        if !state.hotkeyChangeAllowed {
+            shortcutButton.cancelRecording()
+        }
+        shortcutButton.isEnabled = state.hotkeyChangeAllowed
         outputModePopup.selectItem(withTitle: state.preferences.textOutputMode.displayName)
         shortcutErrorLabel.stringValue = state.shortcutError ?? ""
         launchAtLoginCheckbox.state = state.loginItemStatus == .enabled || state.loginItemStatus == .requiresApproval ? .on : .off
@@ -381,5 +394,35 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         if replacementsTextView.string != replacementsText {
             replacementsTextView.string = replacementsText
         }
+    }
+
+    func beginShortcutRecordingForTesting() {
+        shortcutButton.beginRecording()
+    }
+
+    var shortcutButtonTitleForTesting: String {
+        shortcutButton.title
+    }
+
+    func handleShortcutKeyDownForTesting(
+        keyCode: CGKeyCode,
+        modifierFlags: NSEvent.ModifierFlags,
+        charactersIgnoringModifiers: String?
+    ) {
+        shortcutButton.handleKeyDown(
+            keyCode: keyCode,
+            modifierFlags: modifierFlags,
+            charactersIgnoringModifiers: charactersIgnoringModifiers
+        )
+    }
+
+    func handleShortcutFlagsChangedForTesting(
+        keyCode: CGKeyCode,
+        modifierFlags: NSEvent.ModifierFlags
+    ) {
+        shortcutButton.handleFlagsChanged(
+            keyCode: keyCode,
+            modifierFlags: modifierFlags
+        )
     }
 }

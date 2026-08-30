@@ -255,6 +255,143 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(textView.selectedRange(), selection)
     }
 
+    func testShortcutButtonRecordsNextKeyChordAndUpdatesState() {
+        let preferences = AppPreferences(defaults: defaults)
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        var received: HotkeyChoice?
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: {
+                received = $0
+                return true
+            }
+        )
+
+        controller.beginShortcutRecordingForTesting()
+        XCTAssertEqual(controller.shortcutButtonTitleForTesting, "Type shortcut")
+        controller.handleShortcutKeyDownForTesting(
+            keyCode: 0,
+            modifierFlags: [.shift, .command],
+            charactersIgnoringModifiers: "a"
+        )
+
+        let choice = HotkeyChoice(
+            keyCode: 0,
+            requiredFlags: [.maskShift, .maskCommand],
+            keyLabel: "A"
+        )
+        XCTAssertEqual(received, choice)
+        XCTAssertEqual(state.hotkeyChoice, choice)
+        XCTAssertEqual(preferences.hotkeyChoice, choice)
+        XCTAssertEqual(controller.shortcutButtonTitleForTesting, "⇧⌘A")
+    }
+
+    func testEscapeCancelsShortcutRecordingWithoutChangingSavedShortcut() {
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.hotkeyChoice = .rightOption
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        var changeCount = 0
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in
+                changeCount += 1
+                return true
+            }
+        )
+
+        controller.beginShortcutRecordingForTesting()
+        XCTAssertTrue(state.shortcutRecordingActive)
+        controller.handleShortcutKeyDownForTesting(
+            keyCode: 53,
+            modifierFlags: [],
+            charactersIgnoringModifiers: nil
+        )
+
+        XCTAssertEqual(changeCount, 0)
+        XCTAssertFalse(state.shortcutRecordingActive)
+        XCTAssertEqual(preferences.hotkeyChoice, .rightOption)
+        XCTAssertEqual(state.hotkeyChoice, .rightOption)
+        XCTAssertEqual(
+            controller.shortcutButtonTitleForTesting,
+            HotkeyChoice.rightOption.displayName
+        )
+    }
+
+    func testModifierOnlyShortcutRecordsAfterModifierRelease() {
+        let preferences = AppPreferences(defaults: defaults)
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        var received: HotkeyChoice?
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: {
+                received = $0
+                return true
+            }
+        )
+
+        controller.beginShortcutRecordingForTesting()
+        controller.handleShortcutFlagsChangedForTesting(
+            keyCode: 54,
+            modifierFlags: [.command]
+        )
+        XCTAssertNil(received)
+        controller.handleShortcutFlagsChangedForTesting(keyCode: 54, modifierFlags: [])
+
+        XCTAssertEqual(received, .rightCommand)
+        XCTAssertEqual(
+            controller.shortcutButtonTitleForTesting,
+            HotkeyChoice.rightCommand.displayName
+        )
+    }
+
+    func testFunctionKeyRecordsAsStandaloneWhenMacOSAddsFunctionFlag() {
+        let preferences = AppPreferences(defaults: defaults)
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        var received: HotkeyChoice?
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: {
+                received = $0
+                return true
+            }
+        )
+
+        controller.beginShortcutRecordingForTesting()
+        controller.handleShortcutKeyDownForTesting(
+            keyCode: 96,
+            modifierFlags: [.function],
+            charactersIgnoringModifiers: nil
+        )
+
+        XCTAssertEqual(
+            received,
+            HotkeyChoice(keyCode: 96, requiredFlags: [], keyLabel: "F5")
+        )
+        XCTAssertEqual(controller.shortcutButtonTitleForTesting, "F5")
+    }
+
+    func testClosingSettingsCancelsShortcutRecording() {
+        let preferences = AppPreferences(defaults: defaults)
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in true }
+        )
+
+        controller.beginShortcutRecordingForTesting()
+        controller.window?.close()
+
+        XCTAssertEqual(
+            controller.shortcutButtonTitleForTesting,
+            HotkeyChoice.defaultChoice.displayName
+        )
+    }
+
     private func interactiveControls(in view: NSView) -> [NSView] {
         var controls: [NSView] = []
         if view is NSTextView || view is NSPopUpButton || view is NSButton {
