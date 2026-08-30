@@ -12,6 +12,7 @@ public final class SettingsWindowController: NSWindowController {
         action: nil
     )
     private let hotkeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let outputModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let launchAtLoginCheckbox = NSButton(
         checkboxWithTitle: "Launch at login",
         target: nil,
@@ -35,7 +36,7 @@ public final class SettingsWindowController: NSWindowController {
         self.onHotkeyChoiceChanged = onHotkeyChoiceChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 430, height: 340),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -60,6 +61,7 @@ public final class SettingsWindowController: NSWindowController {
         state.refreshPreferences()
         let status = loginItemController.refresh()
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
+        refreshUI()
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -88,6 +90,17 @@ public final class SettingsWindowController: NSWindowController {
         refreshUI()
     }
 
+    @objc private func outputModeChanged(_ sender: NSPopUpButton) {
+        guard sender.indexOfSelectedItem >= 0,
+              sender.indexOfSelectedItem < TextOutputMode.allCases.count
+        else {
+            refreshUI()
+            return
+        }
+        state.preferences.textOutputMode = TextOutputMode.allCases[sender.indexOfSelectedItem]
+        refreshUI()
+    }
+
     @objc private func launchAtLoginChanged(_ sender: NSButton) {
         let status = loginItemController.setEnabled(sender.state == .on)
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
@@ -101,6 +114,10 @@ public final class SettingsWindowController: NSWindowController {
         hotkeyPopup.addItems(withTitles: HotkeyChoice.allCases.map(\.displayName))
         hotkeyPopup.target = self
         hotkeyPopup.action = #selector(hotkeyChanged(_:))
+
+        outputModePopup.addItems(withTitles: TextOutputMode.allCases.map(\.displayName))
+        outputModePopup.target = self
+        outputModePopup.action = #selector(outputModeChanged(_:))
 
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged(_:))
@@ -136,6 +153,16 @@ public final class SettingsWindowController: NSWindowController {
         shortcutRow.distribution = .fill
         hotkeyPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
+        let outputModeRow = NSStackView(views: [
+            NSTextField(labelWithString: "Text output"),
+            outputModePopup,
+        ])
+        outputModeRow.orientation = .horizontal
+        outputModeRow.spacing = 12
+        outputModeRow.alignment = .centerY
+        outputModeRow.distribution = .fill
+        outputModePopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
         let loginRow = NSStackView(views: [launchAtLoginCheckbox, loginItemStatusLabel])
         loginRow.orientation = .horizontal
         loginRow.spacing = 12
@@ -155,6 +182,7 @@ public final class SettingsWindowController: NSWindowController {
             trailingSpaceCheckbox,
             shortcutRow,
             shortcutErrorLabel,
+            outputModeRow,
             loginRow,
             loginItemErrorLabel,
             NSView(),
@@ -175,6 +203,7 @@ public final class SettingsWindowController: NSWindowController {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
             shortcutRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            outputModeRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             loginRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
@@ -185,6 +214,7 @@ public final class SettingsWindowController: NSWindowController {
         trailingSpaceCheckbox.state = state.preferences.addTrailingSpace ? .on : .off
         hotkeyPopup.selectItem(withTitle: state.hotkeyChoice.displayName)
         hotkeyPopup.isEnabled = state.hotkeyChangeAllowed
+        outputModePopup.selectItem(withTitle: state.preferences.textOutputMode.displayName)
         shortcutErrorLabel.stringValue = state.shortcutError ?? ""
         launchAtLoginCheckbox.state = state.loginItemStatus == .enabled || state.loginItemStatus == .requiresApproval ? .on : .off
         loginItemStatusLabel.stringValue = state.loginItemStatus.displayText

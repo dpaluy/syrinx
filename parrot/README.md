@@ -32,7 +32,15 @@ English model through WhisperKit and keeps audio and transcription in the
 process on the Mac.
 
 After setup, click into any text field, hold Fn, speak, and release Fn. The
-transcript is inserted at the active cursor.
+transcript is inserted at the active cursor. Direct typing with CGEvent is the
+default. Some Electron applications and secure fields can reject direct typing.
+Syrinx does not detect this condition automatically.
+
+Users can select Clipboard paste in Settings for an incompatible destination.
+Syrinx snapshots all clipboard item representations, pastes the transcript,
+and restores the snapshot only if no other process changed the clipboard. The
+Copy Last Dictation menu action copies the last nonempty transcript. Syrinx
+keeps that transcript only in memory and clears it when the app quits.
 
 ## Development CLI
 

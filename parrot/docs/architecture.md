@@ -11,8 +11,9 @@ Syrinx.app
    |
    +--> first-run permission guidance
    |
-   +--> HotkeyMonitor --> AudioCapture --> WhisperKitTranscriber --> TextInjector
-   |                         |                    |
+   +--> HotkeyMonitor --> AudioCapture --> WhisperKitTranscriber --> TextOutputting
+   |                         |                    |                      |
+   |                         |                    |                CGEvent or paste
    |                         +--> RecordingOverlay
    |                         +--> MenuBarController
    |
@@ -26,8 +27,16 @@ Syrinx.app
 3. `AudioCapture` records 16 kHz mono samples only while Fn is held.
 4. `WhisperKitTranscriber` loads the local Whisper model and transcribes the
    completed sample buffer in process.
-5. `TextInjector` inserts the sanitized result at the active cursor.
-6. The overlay and menu bar item show recording and transcription state.
+5. The injected `TextOutputting` boundary sends the sanitized result through
+   direct CGEvent typing by default or through explicit clipboard paste mode.
+6. Clipboard paste restores all prior item representations only when the
+   pasteboard change count still matches Syrinx's write.
+7. The overlay and menu bar item show recording and transcription state.
+
+Syrinx does not infer whether an application accepted direct typing. Secure
+fields and some Electron applications can reject synthesized text. The last
+successful transcript stays in process memory for Copy Last Dictation and is
+not stored on disk.
 
 The app does not request Full Disk Access, Screen Recording, Input Monitoring,
 or Automation. It does not start a child model service or send audio to a

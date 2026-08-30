@@ -13,16 +13,19 @@ public final class DictationSession {
     private let transcriber: any Transcriber
     private let monitorFactory: (HotkeyChoice) -> any HotkeyMonitoring
     private var monitor: any HotkeyMonitoring
-    private let capture: AudioCapture
+    private let capture: any AudioCapturing
     private let overlay: RecordingOverlay
     private let menuBar: MenuBarController
     private let preferences: AppPreferences
+    private let textOutput: any TextOutputting
+    private let copyText: (String) -> Void
     private let loginItemController: LoginItemController
     private let modelStateRelay: ModelStateRelay
     public let settingsState: SettingsState
     private var started = false
     private var prepared = false
     private var workingHotkeyChoice: HotkeyChoice
+    private(set) var lastDictation: String?
 
     private lazy var settingsWindow: SettingsWindowController = {
         SettingsWindowController(
@@ -66,6 +69,8 @@ public final class DictationSession {
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
+        self.textOutput = ConfiguredTextOutput(preferences: preferences)
+        self.copyText = ClipboardText.copy
         self.loginItemController = LoginItemController()
         self.modelStateRelay = modelStateRelay
         self.settingsState = settingsState
@@ -78,6 +83,9 @@ public final class DictationSession {
         menuBar.setSettingsAction { [weak self] in
             self?.showSettings()
         }
+        menuBar.setCopyLastDictationAction { [weak self] in
+            _ = self?.copyLastDictation()
+        }
     }
 
     /// Dependency-injected initializer for runtime tests. It does not touch
@@ -86,9 +94,12 @@ public final class DictationSession {
         model: TranscriptionModel,
         transcriber: any Transcriber,
         monitorFactory: @escaping (HotkeyChoice) -> any HotkeyMonitoring,
+        capture: any AudioCapturing = AudioCapture(),
         preferences: AppPreferences = AppPreferences(),
         loginItemController: LoginItemController,
-        menuBar: MenuBarController
+        menuBar: MenuBarController,
+        textOutput: (any TextOutputting)? = nil,
+        copyText: @escaping (String) -> Void = ClipboardText.copy
     ) {
         let settingsState = SettingsState(
             model: model,
@@ -100,10 +111,12 @@ public final class DictationSession {
         self.transcriber = transcriber
         self.monitorFactory = monitorFactory
         self.monitor = monitorFactory(preferences.hotkeyChoice)
-        self.capture = AudioCapture()
+        self.capture = capture
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
+        self.textOutput = textOutput ?? ConfiguredTextOutput(preferences: preferences)
+        self.copyText = copyText
         self.loginItemController = loginItemController
         self.modelStateRelay = ModelStateRelay()
         self.settingsState = settingsState
@@ -115,6 +128,9 @@ public final class DictationSession {
         menuBar.bind(to: settingsState)
         menuBar.setSettingsAction { [weak self] in
             self?.showSettings()
+        }
+        menuBar.setCopyLastDictationAction { [weak self] in
+            _ = self?.copyLastDictation()
         }
     }
 
@@ -142,6 +158,13 @@ public final class DictationSession {
 
     public func showSettings() {
         settingsWindow.showSettings()
+    }
+
+    @discardableResult
+    func copyLastDictation() -> Bool {
+        guard let lastDictation else { return false }
+        copyText(lastDictation)
+        return true
     }
 
     public func start() throws {
@@ -300,11 +323,15 @@ public final class DictationSession {
                 guard let self else { return }
                 do {
                     let text = try await transcriber.transcribe(samples)
-                    if let output = TextOutputPolicy.output(
-                        for: text,
-                        addTrailingSpace: preferences.addTrailingSpace
-                    ) {
-                        TextInjector.inject(output)
+                    let transcript = TextOutputPolicy.sanitize(text)
+                    if !transcript.isEmpty,
+                       let output = TextOutputPolicy.output(
+                           for: transcript,
+                           addTrailingSpace: preferences.addTrailingSpace
+                       ) {
+                        lastDictation = transcript
+                        menuBar.setLastDictationAvailable(true)
+                        textOutput.output(output)
                     }
                 } catch {
                     menuBar.setStatus("transcription failed")

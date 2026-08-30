@@ -45,11 +45,26 @@ public enum HotkeyChoice: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public enum TextOutputMode: String, CaseIterable, Codable, Sendable {
+    case directTyping
+    case clipboardPaste
+
+    public var displayName: String {
+        switch self {
+        case .directTyping:
+            return "Direct typing"
+        case .clipboardPaste:
+            return "Clipboard paste"
+        }
+    }
+}
+
 /// User preferences that affect the packaged Syrinx app at runtime.
 public final class AppPreferences {
     public enum Keys {
         public static let addTrailingSpace = "Syrinx.addTrailingSpace"
         public static let hotkeyChoice = "Syrinx.hotkeyChoice"
+        public static let textOutputMode = "Syrinx.textOutputMode"
     }
 
     private let defaults: UserDefaults
@@ -87,6 +102,20 @@ public final class AppPreferences {
         }
         set {
             defaults.set(newValue.rawValue, forKey: Keys.hotkeyChoice)
+        }
+    }
+
+    public var textOutputMode: TextOutputMode {
+        get {
+            guard let rawValue = defaults.string(forKey: Keys.textOutputMode),
+                  let mode = TextOutputMode(rawValue: rawValue)
+            else {
+                return .directTyping
+            }
+            return mode
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.textOutputMode)
         }
     }
 }

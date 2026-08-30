@@ -23,19 +23,32 @@ final class SettingsTests: XCTestCase {
 
         XCTAssertTrue(preferences.addTrailingSpace)
         XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
+        XCTAssertEqual(preferences.textOutputMode, .directTyping)
 
         preferences.addTrailingSpace = false
         preferences.hotkeyChoice = .rightOption
+        preferences.textOutputMode = .clipboardPaste
 
         let reloaded = AppPreferences(defaults: defaults)
         XCTAssertFalse(reloaded.addTrailingSpace)
         XCTAssertEqual(reloaded.hotkeyChoice, .rightOption)
+        XCTAssertEqual(reloaded.textOutputMode, .clipboardPaste)
     }
 
-    func testUnknownHotkeyValueFallsBackToFnOrGlobe() {
+    func testUnknownPreferenceValuesFallBackToSafeDefaults() {
         defaults.set("unknown", forKey: AppPreferences.Keys.hotkeyChoice)
+        defaults.set("unknown", forKey: AppPreferences.Keys.textOutputMode)
 
-        XCTAssertEqual(AppPreferences(defaults: defaults).hotkeyChoice, .fnOrGlobe)
+        let preferences = AppPreferences(defaults: defaults)
+        XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
+        XCTAssertEqual(preferences.textOutputMode, .directTyping)
+    }
+
+    func testTextOutputModesHaveExplicitUserFacingNames() {
+        XCTAssertEqual(TextOutputMode.allCases.map(\.displayName), [
+            "Direct typing",
+            "Clipboard paste",
+        ])
     }
 
     func testTextOutputPolicySanitizesAndAddsOneAsciiSpaceOnlyWhenEnabled() {
