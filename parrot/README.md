@@ -29,7 +29,10 @@ Syrinx runs as a menu bar-only application. On first launch it explains the
 required Microphone and Accessibility permissions and the required Fn or
 Globe key setting, Do Nothing. It downloads the recommended Whisper Base
 English model through WhisperKit and keeps audio and transcription in the
-process on the Mac.
+process on the Mac. Settings lists only the in-process WhisperKit models.
+Selecting a model while dictation is idle downloads and prepares it with the
+existing progress UI, then keeps that choice for the next launch. Existing
+users stay on the recommended model until they select another one.
 
 After setup, click into any text field, hold Fn, speak, and release Fn. The
 transcript is inserted at the active cursor. Direct typing with CGEvent is the

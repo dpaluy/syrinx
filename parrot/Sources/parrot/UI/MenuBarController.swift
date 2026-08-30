@@ -9,7 +9,7 @@ public final class MenuBarController {
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
     private let copyLastDictationItem: NSMenuItem
-    private let modelID: String
+    private var modelID: String
     private var settingsAction: (() -> Void)?
     private var copyLastDictationAction: (() -> Void)?
     private var modelState: ModelLifecycleState?
@@ -81,6 +81,7 @@ public final class MenuBarController {
             guard let self, let state else { return }
             self.modelState = state.modelState
             self.hotkeyChoice = state.hotkeyChoice
+            self.setModel(state.model)
             self.renderState()
         }
     }
@@ -112,6 +113,11 @@ public final class MenuBarController {
     public func setModelState(_ state: ModelLifecycleState) {
         modelState = state
         renderState()
+    }
+
+    public func setModel(_ model: TranscriptionModel) {
+        modelID = model.id
+        modelLabel.title = "model: \(model.id)"
     }
 
     public func setHotkeyChoice(_ choice: HotkeyChoice) {

@@ -65,6 +65,7 @@ public final class AppPreferences {
         public static let addTrailingSpace = "Syrinx.addTrailingSpace"
         public static let hotkeyChoice = "Syrinx.hotkeyChoice"
         public static let textOutputMode = "Syrinx.textOutputMode"
+        public static let selectedModelID = "Syrinx.selectedModelID"
     }
 
     private let defaults: UserDefaults
@@ -117,5 +118,11 @@ public final class AppPreferences {
         set {
             defaults.set(newValue.rawValue, forKey: Keys.textOutputMode)
         }
+    }
+
+    /// Nil preserves the recommended model for existing users.
+    public var selectedModelID: String? {
+        get { defaults.string(forKey: Keys.selectedModelID) }
+        set { defaults.set(newValue, forKey: Keys.selectedModelID) }
     }
 }

@@ -5,6 +5,7 @@ public final class SettingsWindowController: NSWindowController {
     private let state: SettingsState
     private let loginItemController: LoginItemController
     private let onHotkeyChoiceChanged: (HotkeyChoice) -> Bool
+    private let onModelChanged: (TranscriptionModel) -> Void
 
     private let trailingSpaceCheckbox = NSButton(
         checkboxWithTitle: "Add a space after dictation",
@@ -22,18 +23,20 @@ public final class SettingsWindowController: NSWindowController {
     private let loginItemErrorLabel = NSTextField(labelWithString: "")
     private let shortcutErrorLabel = NSTextField(labelWithString: "")
     private let versionLabel = NSTextField(labelWithString: "")
-    private let modelLabel = NSTextField(labelWithString: "")
+    private let modelPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let modelStateLabel = NSTextField(labelWithString: "")
     private let modelProgress = NSProgressIndicator(frame: .zero)
 
     public init(
         state: SettingsState,
         loginItemController: LoginItemController? = nil,
-        onHotkeyChoiceChanged: @escaping (HotkeyChoice) -> Bool
+        onHotkeyChoiceChanged: @escaping (HotkeyChoice) -> Bool,
+        onModelChanged: @escaping (TranscriptionModel) -> Void = { _ in }
     ) {
         self.state = state
         self.loginItemController = loginItemController ?? LoginItemController()
         self.onHotkeyChoiceChanged = onHotkeyChoiceChanged
+        self.onModelChanged = onModelChanged
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 430, height: 340),
@@ -101,6 +104,18 @@ public final class SettingsWindowController: NSWindowController {
         refreshUI()
     }
 
+    @objc private func modelChanged(_ sender: NSPopUpButton) {
+        guard state.modelChangeAllowed,
+              sender.indexOfSelectedItem >= 0,
+              sender.indexOfSelectedItem < state.selectableModels.count
+        else {
+            refreshUI()
+            return
+        }
+        onModelChanged(state.selectableModels[sender.indexOfSelectedItem])
+        refreshUI()
+    }
+
     @objc private func launchAtLoginChanged(_ sender: NSButton) {
         let status = loginItemController.setEnabled(sender.state == .on)
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
@@ -119,10 +134,14 @@ public final class SettingsWindowController: NSWindowController {
         outputModePopup.target = self
         outputModePopup.action = #selector(outputModeChanged(_:))
 
+        modelPopup.addItems(withTitles: state.selectableModels.map(Self.modelTitle))
+        modelPopup.target = self
+        modelPopup.action = #selector(modelChanged(_:))
+
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged(_:))
 
-        for label in [versionLabel, modelLabel, modelStateLabel, loginItemStatusLabel] {
+        for label in [versionLabel, modelStateLabel, loginItemStatusLabel] {
             label.alignment = .left
             label.lineBreakMode = .byTruncatingTail
         }
@@ -171,6 +190,7 @@ public final class SettingsWindowController: NSWindowController {
 
         let modelHeader = NSTextField(labelWithString: "Model")
         modelHeader.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+        modelPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let modelStateRow = NSStackView(views: [modelStateLabel, modelProgress])
         modelStateRow.orientation = .horizontal
         modelStateRow.spacing = 8
@@ -188,7 +208,7 @@ public final class SettingsWindowController: NSWindowController {
             NSView(),
             versionLabel,
             modelHeader,
-            modelLabel,
+            modelPopup,
             modelStateRow,
         ])
         stack.orientation = .vertical
@@ -205,9 +225,14 @@ public final class SettingsWindowController: NSWindowController {
             shortcutRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             outputModeRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             loginRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            modelPopup.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
         ])
+    }
+
+    private static func modelTitle(_ model: TranscriptionModel) -> String {
+        "\(model.displayName) (\(model.id), \(model.sizeMB) MB)"
     }
 
     private func refreshUI() {
@@ -220,7 +245,8 @@ public final class SettingsWindowController: NSWindowController {
         loginItemStatusLabel.stringValue = state.loginItemStatus.displayText
         loginItemErrorLabel.stringValue = state.loginItemOperationError.map { "Error: \($0)" } ?? ""
         versionLabel.stringValue = "Version: \(state.appVersion)"
-        modelLabel.stringValue = "\(state.model.displayName) (\(state.model.id))"
+        modelPopup.selectItem(withTitle: Self.modelTitle(state.model))
+        modelPopup.isEnabled = state.modelChangeAllowed
         modelStateLabel.stringValue = state.modelState.displayText
 
         if case .downloading(let progress) = state.modelState, let progress {

@@ -24,15 +24,18 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(preferences.addTrailingSpace)
         XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
         XCTAssertEqual(preferences.textOutputMode, .directTyping)
+        XCTAssertNil(preferences.selectedModelID)
 
         preferences.addTrailingSpace = false
         preferences.hotkeyChoice = .rightOption
         preferences.textOutputMode = .clipboardPaste
+        preferences.selectedModelID = "whisper-small.en"
 
         let reloaded = AppPreferences(defaults: defaults)
         XCTAssertFalse(reloaded.addTrailingSpace)
         XCTAssertEqual(reloaded.hotkeyChoice, .rightOption)
         XCTAssertEqual(reloaded.textOutputMode, .clipboardPaste)
+        XCTAssertEqual(reloaded.selectedModelID, "whisper-small.en")
     }
 
     func testUnknownPreferenceValuesFallBackToSafeDefaults() {

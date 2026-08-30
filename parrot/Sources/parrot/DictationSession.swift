@@ -18,8 +18,15 @@ public final class DictationSession {
         case shortcutRegistrationFailed
     }
 
-    private let model: TranscriptionModel
-    private let transcriber: any Transcriber
+    typealias ModelTranscriberFactory = (
+        TranscriptionModel,
+        @escaping @Sendable (ModelLifecycleState) -> Void
+    ) throws -> any Transcriber
+
+    private var model: TranscriptionModel
+    private var transcriber: any Transcriber
+    private let transcriberFactory: ModelTranscriberFactory
+    private let modelStateHandler: @Sendable (ModelLifecycleState) -> Void
     private let monitorFactory: (HotkeyChoice) -> any HotkeyMonitoring
     private var monitor: any HotkeyMonitoring
     private let capture: any AudioCapturing
@@ -37,6 +44,7 @@ public final class DictationSession {
     private var workingHotkeyChoice: HotkeyChoice
     private var recordingLimitTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
+    private var modelChangeInProgress = false
     private(set) var phase: Phase = .idle
     private(set) var sessionToken: UInt64 = 0
     private(set) var lastDictation: String?
@@ -47,12 +55,19 @@ public final class DictationSession {
             loginItemController: loginItemController,
             onHotkeyChoiceChanged: { [weak self] choice in
                 self?.setHotkeyChoice(choice) ?? false
+            },
+            onModelChanged: { [weak self] model in
+                Task { @MainActor [weak self] in
+                    _ = await self?.setModel(model)
+                }
             }
         )
     }()
 
-    public init(model: TranscriptionModel) throws {
-        let preferences = AppPreferences()
+    public init(
+        model: TranscriptionModel,
+        preferences: AppPreferences = AppPreferences()
+    ) throws {
         let settingsState = SettingsState(
             model: model,
             appVersion: AppVersion.current(),
@@ -65,18 +80,17 @@ public final class DictationSession {
                 settingsState.setModelState(state, sequence: sequence)
             }
         }
-        let transcriber: any Transcriber
-        switch model.engine {
-        case .whisperKit:
-            transcriber = WhisperKitTranscriber(model: model, onStateChange: stateHandler)
-        case .parakeet:
-            transcriber = try TranscriberFactory.make(model: model)
-        }
+        let transcriber = try Self.makeTranscriber(
+            model: model,
+            onStateChange: stateHandler
+        )
         let monitor = HotkeyMonitor(choice: preferences.hotkeyChoice)
         let menuBar = MenuBarController(modelID: model.id)
 
         self.model = model
         self.transcriber = transcriber
+        self.transcriberFactory = Self.makeTranscriber
+        self.modelStateHandler = stateHandler
         self.monitorFactory = { HotkeyMonitor(choice: $0) }
         self.monitor = monitor
         self.capture = AudioCapture()
@@ -117,7 +131,8 @@ public final class DictationSession {
         copyText: @escaping (String) -> Void = ClipboardText.copy,
         recordingLimitWait: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
-        }
+        },
+        transcriberFactory: ModelTranscriberFactory? = nil
     ) {
         let settingsState = SettingsState(
             model: model,
@@ -125,8 +140,17 @@ public final class DictationSession {
             preferences: preferences,
             loginItemStatus: loginItemController.status
         )
+        let modelStateRelay = ModelStateRelay()
+        let stateHandler: @Sendable (ModelLifecycleState) -> Void = { state in
+            let sequence = modelStateRelay.nextSequence()
+            Task { @MainActor in
+                settingsState.setModelState(state, sequence: sequence)
+            }
+        }
         self.model = model
         self.transcriber = transcriber
+        self.transcriberFactory = transcriberFactory ?? Self.makeTranscriber
+        self.modelStateHandler = stateHandler
         self.monitorFactory = monitorFactory
         self.monitor = monitorFactory(preferences.hotkeyChoice)
         self.capture = capture
@@ -137,7 +161,7 @@ public final class DictationSession {
         self.copyText = copyText
         self.recordingLimitWait = recordingLimitWait
         self.loginItemController = loginItemController
-        self.modelStateRelay = ModelStateRelay()
+        self.modelStateRelay = modelStateRelay
         self.settingsState = settingsState
         self.workingHotkeyChoice = preferences.hotkeyChoice
 
@@ -154,17 +178,59 @@ public final class DictationSession {
     }
 
     public func prepare() async throws {
+        setModelChangeInProgress(true)
+        defer { setModelChangeInProgress(false) }
+        try await prepareCurrentModel()
+    }
+
+    @discardableResult
+    public func setModel(_ requestedModel: TranscriptionModel) async -> Bool {
+        guard phase == .idle,
+              settingsState.modelChangeAllowed,
+              let selectedModel = ModelRegistry.inProcessWhisperKitModels.first(where: {
+                  $0.id == requestedModel.id
+              })
+        else { return false }
+        guard selectedModel.id != model.id else { return true }
+
+        let candidate: any Transcriber
+        do {
+            candidate = try transcriberFactory(selectedModel, modelStateHandler)
+        } catch {
+            return false
+        }
+
+        setModelChangeInProgress(true)
+        defer { setModelChangeInProgress(false) }
+        prepared = false
+        model = selectedModel
+        transcriber = candidate
+        preferences.selectedModelID = selectedModel.id
+        settingsState.setModel(selectedModel)
+        menuBar.setModel(selectedModel)
+
+        do {
+            try await prepareCurrentModel()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func prepareCurrentModel() async throws {
+        publishModelState(.checking)
         if model.engine != .whisperKit {
-            publishModelState(.checking)
             publishModelState(.loading)
         }
         do {
             try await transcriber.prepare()
             publishModelState(.ready)
             prepared = true
+            menuBar.setModel(model)
             menuBar.setModelState(.ready)
             menuBar.setHotkeyChoice(preferences.hotkeyChoice)
         } catch {
+            prepared = false
             publishModelState(.failed(Self.errorMessage(error)))
             menuBar.setModelState(settingsState.modelState)
             throw error
@@ -334,7 +400,7 @@ public final class DictationSession {
     }
 
     private func beginRecording() {
-        guard started, phase == .idle else { return }
+        guard started, prepared, !modelChangeInProgress, phase == .idle else { return }
         let token = nextSessionToken()
         do {
             try capture.start()
@@ -422,6 +488,12 @@ public final class DictationSession {
     private func setPhase(_ phase: Phase) {
         self.phase = phase
         settingsState.setHotkeyChangeAllowed(phase == .idle)
+        settingsState.setModelChangeAllowed(phase == .idle && !modelChangeInProgress)
+    }
+
+    private func setModelChangeInProgress(_ inProgress: Bool) {
+        modelChangeInProgress = inProgress
+        settingsState.setModelChangeAllowed(phase == .idle && !inProgress)
     }
 
     private func nextSessionToken() -> UInt64 {
@@ -435,6 +507,18 @@ public final class DictationSession {
         recordingLimitTask = nil
         transcriptionTask?.cancel()
         transcriptionTask = nil
+    }
+
+    private static func makeTranscriber(
+        model: TranscriptionModel,
+        onStateChange: @escaping @Sendable (ModelLifecycleState) -> Void
+    ) throws -> any Transcriber {
+        switch model.engine {
+        case .whisperKit:
+            return WhisperKitTranscriber(model: model, onStateChange: onStateChange)
+        case .parakeet:
+            return try TranscriberFactory.make(model: model)
+        }
     }
 
     private static func errorMessage(_ error: Error) -> String {

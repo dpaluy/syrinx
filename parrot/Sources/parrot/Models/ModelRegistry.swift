@@ -45,11 +45,27 @@ public enum ModelRegistry {
         ),
     ]
 
+    /// Models that the shipping app can load fully in process.
+    public static let inProcessWhisperKitModels: [TranscriptionModel] = shared.filter {
+        $0.engine == .whisperKit && $0.whisperKitID != nil
+    }
+
     public static func find(_ id: String) -> TranscriptionModel? {
         shared.first { $0.id == id }
     }
 
     public static func recommended() -> TranscriptionModel? {
         shared.first { $0.recommended } ?? shared.first
+    }
+
+    /// Resolves a persisted shipping-app choice without exposing service-backed
+    /// development models. An absent or invalid choice keeps recommended behavior.
+    public static func preferredInProcessModel(selectedID: String?) -> TranscriptionModel? {
+        if let selectedID,
+           let selected = inProcessWhisperKitModels.first(where: { $0.id == selectedID }) {
+            return selected
+        }
+        return inProcessWhisperKitModels.first(where: { $0.recommended })
+            ?? inProcessWhisperKitModels.first
     }
 }
