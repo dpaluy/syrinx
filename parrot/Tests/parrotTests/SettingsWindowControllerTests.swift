@@ -47,6 +47,95 @@ final class SettingsWindowControllerTests: XCTestCase {
                 "Expected \(control) frame \(frame) inside content bounds \(contentView.bounds)"
             )
         }
+
+    }
+
+    func testSettingsLayoutGroupsRelatedControlsIntoNamedSections() throws {
+        let controller = makeController()
+        controller.showSettings()
+
+        let window = try XCTUnwrap(controller.window)
+        let labels = textLabels(in: try XCTUnwrap(window.contentView)).map(\.stringValue)
+
+        for title in [
+            "Dictation behavior",
+            "Replacements",
+            "Shortcut and output",
+            "Permissions and startup",
+            "Model",
+            "About",
+        ] {
+            XCTAssertTrue(labels.contains(title), "Expected a \(title) section")
+        }
+    }
+
+    func testMinimumWindowSizeKeepsContentReachableThroughScrolling() throws {
+        let controller = makeController()
+        controller.showSettings()
+
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertTrue(window.styleMask.contains(.resizable))
+        window.setContentSize(window.contentMinSize)
+
+        let contentView = try XCTUnwrap(window.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        let scrollView = try XCTUnwrap(firstSubview(of: NSScrollView.self, in: contentView))
+        let documentView = try XCTUnwrap(scrollView.documentView)
+        documentView.layoutSubtreeIfNeeded()
+
+        XCTAssertTrue(scrollView.hasVerticalScroller)
+        XCTAssertGreaterThan(documentView.bounds.height, scrollView.contentView.bounds.height)
+        for control in interactiveControls(in: documentView) {
+            let frame = control.convert(control.bounds, to: documentView)
+            XCTAssertGreaterThan(frame.width, 0, "Expected usable width for \(control)")
+            XCTAssertGreaterThan(frame.height, 0, "Expected usable height for \(control)")
+            XCTAssertGreaterThanOrEqual(frame.minX, documentView.bounds.minX)
+            XCTAssertLessThanOrEqual(frame.maxX, documentView.bounds.maxX)
+        }
+    }
+
+    func testLongModelAndErrorTextWrapWithinTheSettingsContent() throws {
+        let model = TranscriptionModel(
+            id: "a-model-identifier-that-is-long-enough-to-exercise-the-minimum-window-width",
+            displayName: "A transcription model with a long descriptive display name",
+            engine: .whisperKit,
+            whisperKitID: "long-model",
+            sizeMB: 1_620,
+            languages: ["en"],
+            recommended: false
+        )
+        let state = SettingsState(
+            model: model,
+            selectableModels: [model],
+            preferences: AppPreferences(defaults: defaults),
+            modelState: .failed(String(repeating: "Permission was denied. ", count: 12)),
+            loginItemOperationError: String(repeating: "Approval is required in System Settings. ", count: 8)
+        )
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in true }
+        )
+        controller.showSettings()
+
+        let window = try XCTUnwrap(controller.window)
+        window.setContentSize(window.contentMinSize)
+        let contentView = try XCTUnwrap(window.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        let scrollView = try XCTUnwrap(firstSubview(of: NSScrollView.self, in: contentView))
+        let documentView = try XCTUnwrap(scrollView.documentView)
+        documentView.layoutSubtreeIfNeeded()
+        let labels = textLabels(in: documentView)
+        let modelError = try XCTUnwrap(labels.first { $0.stringValue.hasPrefix("Model failed:") })
+
+        XCTAssertEqual(modelError.lineBreakMode, .byWordWrapping)
+        XCTAssertGreaterThan(modelError.frame.height, modelError.font?.pointSize ?? 0)
+        XCTAssertLessThanOrEqual(modelError.frame.maxX, documentView.bounds.maxX)
+        let expectedModelTitle = model.displayName + " (" + model.id + ", 1620 MB)"
+        XCTAssertTrue(
+            popUpButtons(in: documentView).contains { $0.toolTip == expectedModelTitle },
+            "Expected the complete model name in a tooltip"
+        )
     }
 
     func testShowSettingsCentersWindowInsideActiveScreenVisibleFrame() throws {
@@ -145,6 +234,52 @@ final class SettingsWindowControllerTests: XCTestCase {
             controls.append(contentsOf: interactiveControls(in: subview))
         }
         return controls
+    }
+
+    private func makeController() -> SettingsWindowController {
+        SettingsWindowController(
+            state: SettingsState(
+                model: TestModel.model,
+                selectableModels: [TestModel.model],
+                preferences: AppPreferences(defaults: defaults)
+            ),
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in true }
+        )
+    }
+
+    private func textLabels(in view: NSView) -> [NSTextField] {
+        var labels: [NSTextField] = []
+        if let label = view as? NSTextField, !label.isEditable {
+            labels.append(label)
+        }
+        for subview in view.subviews {
+            labels.append(contentsOf: textLabels(in: subview))
+        }
+        return labels
+    }
+
+    private func firstSubview<View: NSView>(of type: View.Type, in view: NSView) -> View? {
+        if let match = view as? View {
+            return match
+        }
+        for subview in view.subviews {
+            if let match = firstSubview(of: type, in: subview) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func popUpButtons(in view: NSView) -> [NSPopUpButton] {
+        var buttons: [NSPopUpButton] = []
+        if let button = view as? NSPopUpButton {
+            buttons.append(button)
+        }
+        for subview in view.subviews {
+            buttons.append(contentsOf: popUpButtons(in: subview))
+        }
+        return buttons
     }
 
     private func replacementsTextView(in window: NSWindow) -> NSTextView? {
