@@ -5,6 +5,7 @@ import XCTest
 final class DictationSessionShortcutTests: XCTestCase {
     private var defaults: UserDefaults!
     private var suiteName: String!
+    private var menuBar: MenuBarController!
 
     override func setUp() {
         super.setUp()
@@ -137,20 +138,86 @@ final class DictationSessionShortcutTests: XCTestCase {
         session.stop()
     }
 
+    func testMonitoringFailureRemainsVisibleAfterTranscriptionAndPersistsShortcutError() async throws {
+        let factory = FakeHotkeyFactory()
+        let preferences = AppPreferences(defaults: defaults)
+        let session = makeSession(
+            factory: factory,
+            preferences: preferences,
+            capture: FakeAudioCapture(samples: [0.25])
+        )
+
+        try await session.prepare()
+        try session.start()
+        let monitor = try XCTUnwrap(factory.monitors.first)
+        let transcriptionFinished = expectation(description: "transcription finishes")
+        var recordingWasStarted = false
+        session.settingsState.addObserver {
+            if !session.settingsState.hotkeyChangeAllowed {
+                recordingWasStarted = true
+            } else if recordingWasStarted {
+                transcriptionFinished.fulfill()
+            }
+        }
+
+        monitor.emit(.pressed)
+        monitor.emit(.released)
+        monitor.emit(.monitoringFailed)
+        await fulfillment(of: [transcriptionFinished], timeout: 1)
+
+        XCTAssertEqual(menuBar.statusTitleForTesting, "shortcut unavailable")
+        XCTAssertEqual(
+            session.settingsState.shortcutError,
+            "shortcut unavailable; restart Syrinx or re-select the hotkey"
+        )
+    }
+
+    func testMenuBarFailureLatchSurvivesRendersAndClearsOnRecoveryActions() {
+        let menuBar = MenuBarController(modelID: "test-model")
+        let state = SettingsState(model: TestModel.model, preferences: preferencesForTest())
+        menuBar.bind(to: state)
+        state.setModelState(.ready)
+        menuBar.setStarted(true)
+        menuBar.setFailure("shortcut unavailable")
+
+        state.setHotkeyChangeAllowed(false)
+        state.setHotkeyChangeAllowed(true)
+        menuBar.setRecording(false)
+        XCTAssertEqual(menuBar.statusTitleForTesting, "shortcut unavailable")
+
+        menuBar.setStarted(false)
+        menuBar.setStarted(true)
+        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Fn or Globe to dictate")
+
+        menuBar.setHotkeyChoice(.rightOption)
+        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
+
+        menuBar.setFailure("shortcut unavailable")
+        menuBar.setRecording(true)
+        menuBar.setRecording(false)
+        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
+    }
+
+    private func preferencesForTest() -> AppPreferences {
+        AppPreferences(defaults: defaults)
+    }
+
     private func makeSession(
         factory: FakeHotkeyFactory,
-        preferences: AppPreferences
+        preferences: AppPreferences,
+        capture: any DictationAudioCapture = AudioCapture()
     ) -> DictationSession {
         let service = FakeLoginItemService()
         let loginItemController = LoginItemController(service: service)
-        let menuBar = MenuBarController(modelID: "test-model")
+        menuBar = MenuBarController(modelID: "test-model")
         return DictationSession(
             model: TestModel.model,
             transcriber: TestTranscriber(),
             monitorFactory: { choice in factory.make(choice: choice) },
             preferences: preferences,
             loginItemController: loginItemController,
-            menuBar: menuBar
+            menuBar: menuBar,
+            capture: capture
         )
     }
 }
@@ -213,6 +280,7 @@ private final class FakeHotkeyMonitor: HotkeyMonitoring {
     let shouldFailStart: Bool
     private(set) var isRunning = false
     private(set) var stopCount = 0
+    private var onEvent: ((HotkeyMonitor.Event) -> Void)?
 
     init(choice: HotkeyChoice, shouldFailStart: Bool) {
         self.choice = choice
@@ -223,12 +291,37 @@ private final class FakeHotkeyMonitor: HotkeyMonitoring {
         if shouldFailStart {
             throw FakeHotkeyError.registrationFailed
         }
+        self.onEvent = onEvent
         isRunning = true
+    }
+
+    func emit(_ event: HotkeyMonitor.Event) {
+        onEvent?(event)
     }
 
     func stop() {
         stopCount += 1
         isRunning = false
+    }
+}
+
+private final class FakeAudioCapture: DictationAudioCapture {
+    var onLevel: ((Float) -> Void)?
+    private let samples: [Float]
+    private var isRecording = false
+
+    init(samples: [Float]) {
+        self.samples = samples
+    }
+
+    func start() throws {
+        isRecording = true
+    }
+
+    func stop() -> [Float] {
+        guard isRecording else { return [] }
+        isRecording = false
+        return samples
     }
 }
 

@@ -147,7 +147,7 @@ final class HotkeyMonitorTests: XCTestCase {
         XCTAssertEqual(lifecycle.maximumInstalledCount, 1)
     }
 
-    func testFailedTapRecreationReportsMonitoringFailureAndRemovesSource() throws {
+    func testFailedTapRecreationReportsReleaseBeforeMonitoringFailure() throws {
         let lifecycle = FakeEventTapLifecycle(
             creationResults: [true, false],
             enableResults: [true, false]
@@ -156,9 +156,13 @@ final class HotkeyMonitorTests: XCTestCase {
         var events: [HotkeyMonitor.Event] = []
         try monitor.start { events.append($0) }
 
+        monitor.handle(
+            type: .flagsChanged,
+            event: event(keyCode: monitor.choice.keyCode, flags: monitor.choice.requiredFlags)
+        )
         monitor.handleTapDisabled(type: .tapDisabledByTimeout)
 
-        XCTAssertEqual(events, [.monitoringFailed])
+        XCTAssertEqual(events, [.pressed, .released, .monitoringFailed])
         XCTAssertEqual(lifecycle.installedCount, 0)
         XCTAssertEqual(lifecycle.maximumInstalledCount, 1)
     }

@@ -14,6 +14,7 @@ public final class MenuBarController {
     private var hotkeyChoice: HotkeyChoice = .fnOrGlobe
     private var isBusy = false
     private var isStarted = false
+    private var stickyError: String?
 
     public init(modelID: String, settingsAction: (() -> Void)? = nil) {
         self.modelID = modelID
@@ -69,6 +70,7 @@ public final class MenuBarController {
     public func setRecording(_ recording: Bool) {
         isBusy = recording
         if recording {
+            stickyError = nil
             stateLabel.title = "● recording"
         } else {
             renderState()
@@ -82,12 +84,21 @@ public final class MenuBarController {
 
     public func setStarted(_ started: Bool) {
         isStarted = started
+        if started {
+            stickyError = nil
+        }
         renderState()
     }
 
     public func setStatus(_ status: String) {
         isBusy = false
         stateLabel.title = status
+    }
+
+    internal func setFailure(_ failure: String) {
+        stickyError = failure
+        isBusy = false
+        renderState()
     }
 
     public func setModelState(_ state: ModelLifecycleState) {
@@ -97,10 +108,15 @@ public final class MenuBarController {
 
     public func setHotkeyChoice(_ choice: HotkeyChoice) {
         hotkeyChoice = choice
+        stickyError = nil
         renderState()
     }
 
     private func renderState() {
+        if let stickyError {
+            stateLabel.title = stickyError
+            return
+        }
         guard !isBusy else { return }
         guard isStarted else {
             if let modelState, case .failed = modelState {
@@ -118,6 +134,8 @@ public final class MenuBarController {
             stateLabel.title = "ready · hold \(hotkeyChoice.displayName) to dictate"
         }
     }
+
+    internal var statusTitleForTesting: String { stateLabel.title }
 
     private func configureButton(recording: Bool) {
         guard let button = statusItem.button else { return }

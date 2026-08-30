@@ -109,7 +109,7 @@ struct Run: ParsableCommand {
                 case .monitoringFailed:
                     FileHandle.standardError.write(Data("hotkey tap recovery failed\n".utf8))
                     MainActor.assumeIsolated {
-                        menuBar.setStatus("shortcut unavailable")
+                        menuBar.setFailure("shortcut unavailable")
                     }
                 case .pressed:
                     do {
