@@ -45,11 +45,36 @@ public enum HotkeyChoice: String, CaseIterable, Codable, Sendable {
     }
 }
 
+enum LiteralReplacementSettingsText {
+    static func encode(_ replacements: [LiteralReplacement]) -> String {
+        replacements
+            .map { "\($0.match) => \($0.replacement)" }
+            .joined(separator: "\n")
+    }
+
+    static func decode(_ text: String) -> [LiteralReplacement] {
+        text.components(separatedBy: .newlines).compactMap { line in
+            guard !line.trimmingCharacters(in: .whitespaces).isEmpty,
+                  let separator = line.range(of: "=>")
+            else {
+                return nil
+            }
+            let match = line[..<separator.lowerBound]
+                .trimmingCharacters(in: .whitespaces)
+            let replacement = line[separator.upperBound...]
+                .trimmingCharacters(in: .whitespaces)
+            return LiteralReplacement(match: match, replacement: replacement)
+        }
+    }
+}
+
 /// User preferences that affect the packaged Syrinx app at runtime.
 public final class AppPreferences {
     public enum Keys {
         public static let addTrailingSpace = "Syrinx.addTrailingSpace"
         public static let hotkeyChoice = "Syrinx.hotkeyChoice"
+        public static let literalReplacements = "Syrinx.literalReplacements"
+        public static let spokenPunctuationEnabled = "Syrinx.spokenPunctuationEnabled"
     }
 
     private let defaults: UserDefaults
@@ -74,6 +99,36 @@ public final class AppPreferences {
     public var trailingSpace: Bool {
         get { addTrailingSpace }
         set { addTrailingSpace = newValue }
+    }
+
+    public var literalReplacements: [LiteralReplacement] {
+        get {
+            guard let data = defaults.data(forKey: Keys.literalReplacements),
+                  let replacements = try? JSONDecoder().decode(
+                      [LiteralReplacement].self,
+                      from: data
+                  )
+            else {
+                return []
+            }
+            return replacements
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            defaults.set(data, forKey: Keys.literalReplacements)
+        }
+    }
+
+    public var spokenPunctuationEnabled: Bool {
+        get {
+            guard let value = defaults.object(forKey: Keys.spokenPunctuationEnabled) as? Bool else {
+                return false
+            }
+            return value
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.spokenPunctuationEnabled)
+        }
     }
 
     public var hotkeyChoice: HotkeyChoice {

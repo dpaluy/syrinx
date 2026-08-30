@@ -302,7 +302,9 @@ public final class DictationSession {
                     let text = try await transcriber.transcribe(samples)
                     if let output = TextOutputPolicy.output(
                         for: text,
-                        addTrailingSpace: preferences.addTrailingSpace
+                        addTrailingSpace: preferences.addTrailingSpace,
+                        literalReplacements: preferences.literalReplacements,
+                        spokenPunctuationEnabled: preferences.spokenPunctuationEnabled
                     ) {
                         TextInjector.inject(output)
                     }

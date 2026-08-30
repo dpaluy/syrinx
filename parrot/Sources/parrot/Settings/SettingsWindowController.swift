@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-public final class SettingsWindowController: NSWindowController {
+public final class SettingsWindowController: NSWindowController, NSTextViewDelegate {
     private let state: SettingsState
     private let loginItemController: LoginItemController
     private let onHotkeyChoiceChanged: (HotkeyChoice) -> Bool
@@ -11,6 +11,13 @@ public final class SettingsWindowController: NSWindowController {
         target: nil,
         action: nil
     )
+    private let spokenPunctuationCheckbox = NSButton(
+        checkboxWithTitle: "Convert spoken punctuation",
+        target: nil,
+        action: nil
+    )
+    private let replacementsTextView = NSTextView(frame: .zero)
+    private let replacementsScrollView = NSScrollView(frame: .zero)
     private let hotkeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let launchAtLoginCheckbox = NSButton(
         checkboxWithTitle: "Launch at login",
@@ -35,7 +42,7 @@ public final class SettingsWindowController: NSWindowController {
         self.onHotkeyChoiceChanged = onHotkeyChoiceChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 430, height: 430),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -70,6 +77,18 @@ public final class SettingsWindowController: NSWindowController {
         refreshUI()
     }
 
+    @objc private func spokenPunctuationChanged(_ sender: NSButton) {
+        state.preferences.spokenPunctuationEnabled = sender.state == .on
+        refreshUI()
+    }
+
+    public func textDidChange(_ notification: Notification) {
+        guard notification.object as? NSTextView === replacementsTextView else { return }
+        state.preferences.literalReplacements = LiteralReplacementSettingsText.decode(
+            replacementsTextView.string
+        )
+    }
+
     @objc private func hotkeyChanged(_ sender: NSPopUpButton) {
         guard state.hotkeyChangeAllowed,
               sender.indexOfSelectedItem >= 0,
@@ -97,6 +116,22 @@ public final class SettingsWindowController: NSWindowController {
     private func configureControls() {
         trailingSpaceCheckbox.target = self
         trailingSpaceCheckbox.action = #selector(trailingSpaceChanged(_:))
+
+        spokenPunctuationCheckbox.target = self
+        spokenPunctuationCheckbox.action = #selector(spokenPunctuationChanged(_:))
+
+        replacementsTextView.delegate = self
+        replacementsTextView.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        replacementsTextView.isRichText = false
+        replacementsTextView.isAutomaticQuoteSubstitutionEnabled = false
+        replacementsTextView.isAutomaticDashSubstitutionEnabled = false
+        replacementsTextView.isAutomaticSpellingCorrectionEnabled = false
+        replacementsTextView.isHorizontallyResizable = false
+        replacementsTextView.isVerticallyResizable = true
+        replacementsTextView.textContainer?.widthTracksTextView = true
+        replacementsScrollView.borderType = .bezelBorder
+        replacementsScrollView.hasVerticalScroller = true
+        replacementsScrollView.documentView = replacementsTextView
 
         hotkeyPopup.addItems(withTitles: HotkeyChoice.allCases.map(\.displayName))
         hotkeyPopup.target = self
@@ -126,6 +161,13 @@ public final class SettingsWindowController: NSWindowController {
         let settingsHeader = NSTextField(labelWithString: "Settings")
         settingsHeader.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
 
+        let replacementsLabel = NSTextField(labelWithString: "Literal replacements")
+        let replacementsHelp = NSTextField(
+            wrappingLabelWithString: "Use one line for each replacement: spoken form => replacement"
+        )
+        replacementsHelp.textColor = .secondaryLabelColor
+        replacementsHelp.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+
         let shortcutRow = NSStackView(views: [
             NSTextField(labelWithString: "Hold shortcut"),
             hotkeyPopup,
@@ -153,6 +195,10 @@ public final class SettingsWindowController: NSWindowController {
         let stack = NSStackView(views: [
             settingsHeader,
             trailingSpaceCheckbox,
+            spokenPunctuationCheckbox,
+            replacementsLabel,
+            replacementsScrollView,
+            replacementsHelp,
             shortcutRow,
             shortcutErrorLabel,
             loginRow,
@@ -174,6 +220,9 @@ public final class SettingsWindowController: NSWindowController {
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            replacementsScrollView.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            replacementsScrollView.heightAnchor.constraint(equalToConstant: 64),
+            replacementsHelp.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             shortcutRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             loginRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
@@ -183,6 +232,13 @@ public final class SettingsWindowController: NSWindowController {
 
     private func refreshUI() {
         trailingSpaceCheckbox.state = state.preferences.addTrailingSpace ? .on : .off
+        spokenPunctuationCheckbox.state = state.preferences.spokenPunctuationEnabled ? .on : .off
+        let replacementsText = LiteralReplacementSettingsText.encode(
+            state.preferences.literalReplacements
+        )
+        if replacementsTextView.string != replacementsText {
+            replacementsTextView.string = replacementsText
+        }
         hotkeyPopup.selectItem(withTitle: state.hotkeyChoice.displayName)
         hotkeyPopup.isEnabled = state.hotkeyChangeAllowed
         shortcutErrorLabel.stringValue = state.shortcutError ?? ""

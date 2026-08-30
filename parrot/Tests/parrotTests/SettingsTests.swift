@@ -23,13 +23,23 @@ final class SettingsTests: XCTestCase {
 
         XCTAssertTrue(preferences.addTrailingSpace)
         XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
+        XCTAssertFalse(preferences.spokenPunctuationEnabled)
+        XCTAssertEqual(preferences.literalReplacements, [])
 
+        let replacements = [
+            LiteralReplacement(match: "syrinks", replacement: "Syrinx"),
+            LiteralReplacement(match: "git hub", replacement: "GitHub"),
+        ]
         preferences.addTrailingSpace = false
         preferences.hotkeyChoice = .rightOption
+        preferences.spokenPunctuationEnabled = true
+        preferences.literalReplacements = replacements
 
         let reloaded = AppPreferences(defaults: defaults)
         XCTAssertFalse(reloaded.addTrailingSpace)
         XCTAssertEqual(reloaded.hotkeyChoice, .rightOption)
+        XCTAssertTrue(reloaded.spokenPunctuationEnabled)
+        XCTAssertEqual(reloaded.literalReplacements, replacements)
     }
 
     func testUnknownHotkeyValueFallsBackToFnOrGlobe() {
@@ -67,6 +77,76 @@ final class SettingsTests: XCTestCase {
             TextOutputPolicy.output(for: "Hello, world!", addTrailingSpace: false),
             "Hello, world!"
         )
+    }
+
+    func testLiteralReplacementsRunInConfiguredOrder() {
+        let replacements = [
+            LiteralReplacement(match: "Syrinx", replacement: "the app"),
+            LiteralReplacement(match: "the app", replacement: "Syrinx for Mac"),
+        ]
+
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: "Use Syrinx",
+                addTrailingSpace: false,
+                literalReplacements: replacements
+            ),
+            "Use Syrinx for Mac"
+        )
+    }
+
+    func testSpokenPunctuationCanBeEnabledWithoutReplacements() {
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: "Hello comma world period",
+                addTrailingSpace: false,
+                spokenPunctuationEnabled: true
+            ),
+            "Hello, world."
+        )
+    }
+
+    func testEmptyReplacementValueIsDeterministic() {
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: "remove filler",
+                addTrailingSpace: false,
+                literalReplacements: [LiteralReplacement(match: " filler", replacement: "")]
+            ),
+            "remove"
+        )
+    }
+
+    func testReplacementSettingsTextPreservesOrderAndEmptyReplacementValues() {
+        let replacements = [
+            LiteralReplacement(match: "syrinks", replacement: "Syrinx"),
+            LiteralReplacement(match: "filler", replacement: ""),
+        ]
+
+        let encoded = LiteralReplacementSettingsText.encode(replacements)
+
+        XCTAssertEqual(encoded, "syrinks => Syrinx\nfiller => ")
+        XCTAssertEqual(LiteralReplacementSettingsText.decode(encoded), replacements)
+    }
+
+    func testInvalidEmptyMatchFailsOpenToOriginalSanitizedTranscript() {
+        XCTAssertEqual(
+            TextOutputPolicy.output(
+                for: " [MUSIC] Hello period ",
+                addTrailingSpace: true,
+                literalReplacements: [LiteralReplacement(match: "", replacement: "invalid")],
+                spokenPunctuationEnabled: true
+            ),
+            "Hello period "
+        )
+    }
+
+    func testDisabledTransformationsPreserveExistingOutputBehavior() {
+        XCTAssertEqual(
+            TextOutputPolicy.output(for: "Hello comma world period", addTrailingSpace: true),
+            "Hello comma world period "
+        )
+        XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO]", addTrailingSpace: false))
     }
 
     func testHotkeyChoicesHaveStableNamesAndModifierPolicies() {
