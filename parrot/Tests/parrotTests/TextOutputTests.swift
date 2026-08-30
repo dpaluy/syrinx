@@ -23,7 +23,7 @@ final class TextOutputTests: XCTestCase {
     func testSessionUsesInjectedOutputAndKeepsLastDictationOnlyInMemory() async throws {
         let output = RecordingTextOutput()
         let copied = StringRecorder()
-        let capture = FakeAudioCapture(samples: [0.25])
+        let capture = FakeAudioCapture(samples: [Float](repeating: 0.25, count: 4_800))
         let monitor = FakeSessionHotkeyMonitor()
         let preferences = AppPreferences(defaults: defaults)
         let delivered = expectation(description: "text delivered")
@@ -47,6 +47,35 @@ final class TextOutputTests: XCTestCase {
         XCTAssertEqual(session.lastDictation, "hello world")
         XCTAssertTrue(session.copyLastDictation())
         XCTAssertEqual(copied.values, ["hello world"])
+    }
+
+    func testSessionAppliesConfiguredTransformationsBeforeSelectedOutput() async throws {
+        let output = RecordingTextOutput()
+        let capture = FakeAudioCapture(samples: [Float](repeating: 0.25, count: 4_800))
+        let monitor = FakeSessionHotkeyMonitor()
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.literalReplacements = [
+            LiteralReplacement(match: "syrinks", replacement: "Syrinx")
+        ]
+        preferences.spokenPunctuationEnabled = true
+        let delivered = expectation(description: "transformed text delivered")
+        output.onOutput = { delivered.fulfill() }
+        let session = makeSession(
+            transcriber: ImmediateTranscriber(text: "Use syrinks comma world period"),
+            monitor: monitor,
+            capture: capture,
+            preferences: preferences,
+            textOutput: output,
+            copyText: { _ in }
+        )
+
+        try await session.prepare()
+        try session.start()
+        monitor.send(.pressed)
+        monitor.send(.released)
+        await fulfillment(of: [delivered], timeout: 1)
+
+        XCTAssertEqual(output.values, ["Use Syrinx, world. "])
     }
 
     func testConfiguredOutputNeverUsesClipboardWhenDirectTypingIsSelected() {

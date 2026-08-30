@@ -60,7 +60,10 @@ final class DictationSessionModelTests: XCTestCase {
             },
             preferences: AppPreferences(defaults: defaults),
             monitor: monitor,
-            capture: ModelAudioCapture(results: [[0.1], [0.2]])
+            capture: ModelAudioCapture(results: [
+                [Float](repeating: 0.1, count: 4_800),
+                [Float](repeating: 0.2, count: 4_800),
+            ])
         )
         try await session.prepare()
         try session.start()
@@ -118,7 +121,7 @@ final class DictationSessionModelTests: XCTestCase {
         let initial = try XCTUnwrap(ModelRegistry.recommended())
         let selected = try XCTUnwrap(ModelRegistry.find("whisper-small.en"))
         let monitor = ModelHotkeyMonitor()
-        let capture = ModelAudioCapture(results: [[0.1]])
+        let capture = ModelAudioCapture(results: [[Float](repeating: 0.1, count: 4_800)])
         let factory = ModelTestTranscriberFactory { model in
             ImmediateModelTranscriber(modelID: model.id)
         }

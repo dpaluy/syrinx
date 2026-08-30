@@ -1,6 +1,15 @@
 import AppKit
 import Foundation
 
+internal protocol DictationAudioCapture: AudioCapturing {
+    var onLevel: ((Float) -> Void)? { get set }
+    func start() throws
+    @discardableResult
+    func stop() -> [Float]
+}
+
+extension AudioCapture: DictationAudioCapture {}
+
 @MainActor
 public final class DictationSession {
     enum Phase: Equatable {
@@ -85,6 +94,7 @@ public final class DictationSession {
             onStateChange: stateHandler
         )
         let monitor = HotkeyMonitor(choice: preferences.hotkeyChoice)
+        let capture = AudioCapture()
         let menuBar = MenuBarController(modelID: model.id)
 
         self.model = model
@@ -93,7 +103,7 @@ public final class DictationSession {
         self.modelStateHandler = stateHandler
         self.monitorFactory = { HotkeyMonitor(choice: $0) }
         self.monitor = monitor
-        self.capture = AudioCapture()
+        self.capture = capture
         self.overlay = RecordingOverlay()
         self.menuBar = menuBar
         self.preferences = preferences
@@ -357,6 +367,7 @@ public final class DictationSession {
         let replacement = monitorFactory(choice)
         do {
             try register(replacement)
+            menuBar.clearFailure()
             monitor = replacement
             preferences.hotkeyChoice = choice
             workingHotkeyChoice = choice
@@ -369,6 +380,7 @@ public final class DictationSession {
             let restored = monitorFactory(previous)
             do {
                 try register(restored)
+                menuBar.clearFailure()
                 monitor = restored
                 preferences.hotkeyChoice = previous
                 workingHotkeyChoice = previous
@@ -416,6 +428,9 @@ public final class DictationSession {
 
     private func handle(_ event: HotkeyMonitor.Event) {
         switch event {
+        case .monitoringFailed:
+            menuBar.setFailure("shortcut unavailable")
+            settingsState.setShortcutError("shortcut unavailable; restart Syrinx or re-select the hotkey")
         case .pressed:
             beginRecording()
         case .released:
@@ -455,7 +470,7 @@ public final class DictationSession {
         recordingLimitTask?.cancel()
         recordingLimitTask = nil
         let samples = capture.stop()
-        guard !samples.isEmpty else {
+        guard UtteranceAcceptancePolicy.accepts(sampleCount: samples.count) else {
             resetActiveSessionUI()
             return
         }
@@ -490,7 +505,9 @@ public final class DictationSession {
         guard !transcript.isEmpty,
               let output = TextOutputPolicy.output(
                   for: transcript,
-                  addTrailingSpace: preferences.addTrailingSpace
+                  addTrailingSpace: preferences.addTrailingSpace,
+                  literalReplacements: preferences.literalReplacements,
+                  spokenPunctuationEnabled: preferences.spokenPunctuationEnabled
               )
         else { return }
         lastDictation = transcript

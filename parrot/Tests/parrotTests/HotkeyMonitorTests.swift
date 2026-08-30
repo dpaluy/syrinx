@@ -114,6 +114,79 @@ final class HotkeyMonitorTests: XCTestCase {
         XCTAssertTrue(events.isEmpty)
     }
 
+    func testDisabledTapTypesReleasePressedStateAndReenableExistingTap() throws {
+        for type in [CGEventType.tapDisabledByTimeout, .tapDisabledByUserInput] {
+            let lifecycle = FakeEventTapLifecycle(enableResults: [true, true])
+            let monitor = makeMonitor(lifecycle: lifecycle)
+            var events: [HotkeyMonitor.Event] = []
+            try monitor.start { events.append($0) }
+
+            monitor.handle(
+                type: .flagsChanged,
+                event: event(keyCode: monitor.choice.keyCode, flags: monitor.choice.requiredFlags)
+            )
+            monitor.handleTapDisabled(type: type)
+            monitor.handle(
+                type: .flagsChanged,
+                event: event(keyCode: monitor.choice.keyCode, flags: monitor.choice.requiredFlags)
+            )
+
+            XCTAssertEqual(events, [.pressed, .released, .pressed])
+            XCTAssertEqual(lifecycle.registrationCount, 1)
+            XCTAssertEqual(lifecycle.installedCount, 1)
+            XCTAssertEqual(lifecycle.maximumInstalledCount, 1)
+            monitor.stop()
+        }
+    }
+
+    func testFailedReenableRecreatesTapWithoutDuplicateRunLoopSources() throws {
+        let lifecycle = FakeEventTapLifecycle(
+            enableResults: [true, false, true, false, true]
+        )
+        let monitor = makeMonitor(lifecycle: lifecycle)
+        var events: [HotkeyMonitor.Event] = []
+        try monitor.start { events.append($0) }
+
+        monitor.handleTapDisabled(type: .tapDisabledByTimeout)
+        monitor.handleTapDisabled(type: .tapDisabledByUserInput)
+
+        XCTAssertTrue(events.isEmpty)
+        XCTAssertEqual(lifecycle.registrationCount, 3)
+        XCTAssertEqual(lifecycle.installCount, 3)
+        XCTAssertEqual(lifecycle.uninstallCount, 2)
+        XCTAssertEqual(lifecycle.installedCount, 1)
+        XCTAssertEqual(lifecycle.maximumInstalledCount, 1)
+    }
+
+    func testFailedTapRecreationReportsReleaseBeforeMonitoringFailure() throws {
+        let lifecycle = FakeEventTapLifecycle(
+            creationResults: [true, false],
+            enableResults: [true, false]
+        )
+        let monitor = makeMonitor(lifecycle: lifecycle)
+        var events: [HotkeyMonitor.Event] = []
+        try monitor.start { events.append($0) }
+
+        monitor.handle(
+            type: .flagsChanged,
+            event: event(keyCode: monitor.choice.keyCode, flags: monitor.choice.requiredFlags)
+        )
+        monitor.handleTapDisabled(type: .tapDisabledByTimeout)
+
+        XCTAssertEqual(events, [.pressed, .released, .monitoringFailed])
+        XCTAssertEqual(lifecycle.installedCount, 0)
+        XCTAssertEqual(lifecycle.maximumInstalledCount, 1)
+    }
+
+    private func makeMonitor(lifecycle: FakeEventTapLifecycle) -> HotkeyMonitor {
+        HotkeyMonitor(
+            choice: .fnOrGlobe,
+            debug: false,
+            eventTapLifecycle: lifecycle,
+            isAccessibilityTrusted: { true }
+        )
+    }
+
     private func event(keyCode: CGKeyCode, flags: CGEventFlags) -> CGEvent {
         let event = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false)!
         event.flags = flags
@@ -124,5 +197,63 @@ final class HotkeyMonitorTests: XCTestCase {
 private extension HotkeyMonitor {
     func handleForTesting(_ onEvent: @escaping (Event) -> Void) throws {
         setTestingHandler(onEvent)
+    }
+}
+
+private final class FakeEventTapRegistration: EventTapRegistration {
+    var isEnabled = false
+}
+
+private final class FakeEventTapLifecycle: EventTapLifecycle {
+    private var creationResults: [Bool]
+    private var enableResults: [Bool]
+    private var installed: Set<ObjectIdentifier> = []
+
+    private(set) var registrationCount = 0
+    private(set) var installCount = 0
+    private(set) var uninstallCount = 0
+    private(set) var maximumInstalledCount = 0
+
+    var installedCount: Int { installed.count }
+
+    init(
+        creationResults: [Bool] = [],
+        enableResults: [Bool]
+    ) {
+        self.creationResults = creationResults
+        self.enableResults = enableResults
+    }
+
+    func makeRegistration(userInfo: UnsafeMutableRawPointer) -> (any EventTapRegistration)? {
+        let shouldCreate = creationResults.isEmpty ? true : creationResults.removeFirst()
+        guard shouldCreate else { return nil }
+        registrationCount += 1
+        return FakeEventTapRegistration()
+    }
+
+    func install(_ registration: any EventTapRegistration) {
+        installCount += 1
+        installed.insert(ObjectIdentifier(registration))
+        maximumInstalledCount = max(maximumInstalledCount, installed.count)
+    }
+
+    func uninstall(_ registration: any EventTapRegistration) {
+        uninstallCount += 1
+        installed.remove(ObjectIdentifier(registration))
+    }
+
+    func enable(_ registration: any EventTapRegistration) {
+        let registration = registration as! FakeEventTapRegistration
+        registration.isEnabled = enableResults.removeFirst()
+    }
+
+    func disable(_ registration: any EventTapRegistration) {
+        let registration = registration as! FakeEventTapRegistration
+        registration.isEnabled = false
+    }
+
+    func isEnabled(_ registration: any EventTapRegistration) -> Bool {
+        let registration = registration as! FakeEventTapRegistration
+        return registration.isEnabled
     }
 }

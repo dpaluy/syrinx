@@ -6,7 +6,7 @@ final class DictationSessionLifecycleTests: XCTestCase {
     func testCancelDuringTranscriptionSuppressesLateResult() async throws {
         let transcriber = DeferredSessionTranscriber()
         let output = LifecycleRecordingOutput()
-        let capture = LifecycleAudioCapture(results: [[0.1]])
+        let capture = LifecycleAudioCapture(results: [[Float](repeating: 0.1, count: 4_800)])
         let monitor = LifecycleHotkeyMonitor()
         let session = makeSession(
             transcriber: transcriber,
@@ -37,7 +37,10 @@ final class DictationSessionLifecycleTests: XCTestCase {
     func testNewDictationCannotReceiveOlderSessionResult() async throws {
         let transcriber = DeferredSessionTranscriber()
         let output = LifecycleRecordingOutput()
-        let capture = LifecycleAudioCapture(results: [[0.1], [0.2]])
+        let capture = LifecycleAudioCapture(results: [
+            [Float](repeating: 0.1, count: 4_800),
+            [Float](repeating: 0.2, count: 4_800),
+        ])
         let monitor = LifecycleHotkeyMonitor()
         let session = makeSession(
             transcriber: transcriber,
@@ -78,7 +81,7 @@ final class DictationSessionLifecycleTests: XCTestCase {
         let limit = RecordingLimitGate()
         let transcriber = CountingSessionTranscriber(text: "limited")
         let output = LifecycleRecordingOutput()
-        let capture = LifecycleAudioCapture(results: [[0.1, 0.2]])
+        let capture = LifecycleAudioCapture(results: [[Float](repeating: 0.1, count: 4_800)])
         let monitor = LifecycleHotkeyMonitor()
         let session = makeSession(
             transcriber: transcriber,
@@ -114,7 +117,7 @@ final class DictationSessionLifecycleTests: XCTestCase {
     func testCancelDuringRecordingDiscardsAudioWithoutTranscribing() async throws {
         let transcriber = CountingSessionTranscriber(text: "must not appear")
         let output = LifecycleRecordingOutput()
-        let capture = LifecycleAudioCapture(results: [[0.1]])
+        let capture = LifecycleAudioCapture(results: [[Float](repeating: 0.1, count: 4_800)])
         let monitor = LifecycleHotkeyMonitor()
         let session = makeSession(
             transcriber: transcriber,
@@ -140,7 +143,10 @@ final class DictationSessionLifecycleTests: XCTestCase {
     func testStopInvalidatesRecordingAndTranscriptionAndReturnsToIdle() async throws {
         let transcriber = DeferredSessionTranscriber()
         let output = LifecycleRecordingOutput()
-        let capture = LifecycleAudioCapture(results: [[0.1], [0.2]])
+        let capture = LifecycleAudioCapture(results: [
+            [Float](repeating: 0.1, count: 4_800),
+            [Float](repeating: 0.2, count: 4_800),
+        ])
         let monitor = LifecycleHotkeyMonitor()
         let session = makeSession(
             transcriber: transcriber,
