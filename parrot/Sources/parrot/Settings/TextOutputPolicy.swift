@@ -1,5 +1,14 @@
 import Foundation
 
+/// Decides whether captured audio is long enough to transcribe.
+public enum UtteranceAcceptancePolicy {
+    public static let minimumSampleCount = 4_800
+
+    public static func accepts(sampleCount: Int) -> Bool {
+        sampleCount >= minimumSampleCount
+    }
+}
+
 /// Formats successful transcription output before it reaches the text injector.
 public enum TextOutputPolicy {
     /// Removes common non-speech tokens and normalizes whitespace.
@@ -26,10 +35,13 @@ public enum TextOutputPolicy {
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Returns nil when the sanitized transcript is empty.
+    /// Returns nil when the sanitized transcript is empty or punctuation-only.
     public static func output(for text: String, addTrailingSpace: Bool) -> String? {
         let sanitized = sanitize(text)
-        guard !sanitized.isEmpty else { return nil }
+        let ignoredCharacters = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        guard sanitized.unicodeScalars.contains(where: { !ignoredCharacters.contains($0) }) else {
+            return nil
+        }
         return addTrailingSpace ? sanitized + " " : sanitized
     }
 

@@ -38,6 +38,12 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(AppPreferences(defaults: defaults).hotkeyChoice, .fnOrGlobe)
     }
 
+    func testUtteranceAcceptancePolicyUsesExactMinimumSampleBoundary() {
+        XCTAssertFalse(UtteranceAcceptancePolicy.accepts(sampleCount: 0))
+        XCTAssertFalse(UtteranceAcceptancePolicy.accepts(sampleCount: 4_799))
+        XCTAssertTrue(UtteranceAcceptancePolicy.accepts(sampleCount: 4_800))
+    }
+
     func testTextOutputPolicySanitizesAndAddsOneAsciiSpaceOnlyWhenEnabled() {
         XCTAssertEqual(
             TextOutputPolicy.output(for: "  hello   world  ", addTrailingSpace: true),
@@ -52,6 +58,15 @@ final class SettingsTests: XCTestCase {
             "hello"
         )
         XCTAssertNil(TextOutputPolicy.output(for: " [MUSIC] ", addTrailingSpace: true))
+    }
+
+    func testTextOutputPolicySuppressesPunctuationOnlySanitizedResults() {
+        XCTAssertNil(TextOutputPolicy.output(for: "...!?", addTrailingSpace: false))
+        XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO] — (silence)", addTrailingSpace: true))
+        XCTAssertEqual(
+            TextOutputPolicy.output(for: "Hello, world!", addTrailingSpace: false),
+            "Hello, world!"
+        )
     }
 
     func testHotkeyChoicesHaveStableNamesAndModifierPolicies() {

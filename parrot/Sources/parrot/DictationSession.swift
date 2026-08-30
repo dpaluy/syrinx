@@ -289,7 +289,7 @@ public final class DictationSession {
             settingsState.setHotkeyChangeAllowed(false)
             overlay.show(.transcribing)
             menuBar.setTranscribing()
-            guard !samples.isEmpty else {
+            guard UtteranceAcceptancePolicy.accepts(sampleCount: samples.count) else {
                 overlay.hide()
                 menuBar.setRecording(false)
                 settingsState.setHotkeyChangeAllowed(true)
