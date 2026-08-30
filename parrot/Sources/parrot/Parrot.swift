@@ -122,6 +122,8 @@ struct Run: ParsableCommand {
                     } catch {
                         FileHandle.standardError.write(Data("capture failed: \(error)\n".utf8))
                     }
+                case .cancel:
+                    break
                 case .released:
                     let samples = capture.stop()
                     MainActor.assumeIsolated {

@@ -23,6 +23,8 @@ final class SettingsTests: XCTestCase {
 
         XCTAssertTrue(preferences.addTrailingSpace)
         XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
+        XCTAssertEqual(preferences.textOutputMode, .directTyping)
+        XCTAssertNil(preferences.selectedModelID)
         XCTAssertFalse(preferences.spokenPunctuationEnabled)
         XCTAssertEqual(preferences.literalReplacements, [])
 
@@ -32,20 +34,34 @@ final class SettingsTests: XCTestCase {
         ]
         preferences.addTrailingSpace = false
         preferences.hotkeyChoice = .rightOption
+        preferences.textOutputMode = .clipboardPaste
+        preferences.selectedModelID = "whisper-small.en"
         preferences.spokenPunctuationEnabled = true
         preferences.literalReplacements = replacements
 
         let reloaded = AppPreferences(defaults: defaults)
         XCTAssertFalse(reloaded.addTrailingSpace)
         XCTAssertEqual(reloaded.hotkeyChoice, .rightOption)
+        XCTAssertEqual(reloaded.textOutputMode, .clipboardPaste)
+        XCTAssertEqual(reloaded.selectedModelID, "whisper-small.en")
         XCTAssertTrue(reloaded.spokenPunctuationEnabled)
         XCTAssertEqual(reloaded.literalReplacements, replacements)
     }
 
-    func testUnknownHotkeyValueFallsBackToFnOrGlobe() {
+    func testUnknownPreferenceValuesFallBackToSafeDefaults() {
         defaults.set("unknown", forKey: AppPreferences.Keys.hotkeyChoice)
+        defaults.set("unknown", forKey: AppPreferences.Keys.textOutputMode)
 
-        XCTAssertEqual(AppPreferences(defaults: defaults).hotkeyChoice, .fnOrGlobe)
+        let preferences = AppPreferences(defaults: defaults)
+        XCTAssertEqual(preferences.hotkeyChoice, .fnOrGlobe)
+        XCTAssertEqual(preferences.textOutputMode, .directTyping)
+    }
+
+    func testTextOutputModesHaveExplicitUserFacingNames() {
+        XCTAssertEqual(TextOutputMode.allCases.map(\.displayName), [
+            "Direct typing",
+            "Clipboard paste",
+        ])
     }
 
     func testUtteranceAcceptancePolicyUsesExactMinimumSampleBoundary() {

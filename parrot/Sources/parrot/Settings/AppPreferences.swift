@@ -45,6 +45,20 @@ public enum HotkeyChoice: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public enum TextOutputMode: String, CaseIterable, Codable, Sendable {
+    case directTyping
+    case clipboardPaste
+
+    public var displayName: String {
+        switch self {
+        case .directTyping:
+            return "Direct typing"
+        case .clipboardPaste:
+            return "Clipboard paste"
+        }
+    }
+}
+
 enum LiteralReplacementSettingsText {
     private static let separator = " => "
 
@@ -76,6 +90,8 @@ public final class AppPreferences {
     public enum Keys {
         public static let addTrailingSpace = "Syrinx.addTrailingSpace"
         public static let hotkeyChoice = "Syrinx.hotkeyChoice"
+        public static let textOutputMode = "Syrinx.textOutputMode"
+        public static let selectedModelID = "Syrinx.selectedModelID"
         public static let literalReplacements = "Syrinx.literalReplacements"
         public static let spokenPunctuationEnabled = "Syrinx.spokenPunctuationEnabled"
     }
@@ -146,5 +162,25 @@ public final class AppPreferences {
         set {
             defaults.set(newValue.rawValue, forKey: Keys.hotkeyChoice)
         }
+    }
+
+    public var textOutputMode: TextOutputMode {
+        get {
+            guard let rawValue = defaults.string(forKey: Keys.textOutputMode),
+                  let mode = TextOutputMode(rawValue: rawValue)
+            else {
+                return .directTyping
+            }
+            return mode
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.textOutputMode)
+        }
+    }
+
+    /// Nil preserves the recommended model for existing users.
+    public var selectedModelID: String? {
+        get { defaults.string(forKey: Keys.selectedModelID) }
+        set { defaults.set(newValue, forKey: Keys.selectedModelID) }
     }
 }

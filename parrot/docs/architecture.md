@@ -11,8 +11,9 @@ Syrinx.app
    |
    +--> first-run permission guidance
    |
-   +--> HotkeyMonitor --> AudioCapture --> WhisperKitTranscriber --> TextInjector
-   |                         |                    |
+   +--> HotkeyMonitor --> AudioCapture --> WhisperKitTranscriber --> TextOutputting
+   |                         |                    |                      |
+   |                         |                    |                CGEvent or paste
    |                         +--> RecordingOverlay
    |                         +--> MenuBarController
    |
@@ -24,10 +25,29 @@ Syrinx.app
 2. `HotkeyMonitor` observes Fn press and release after Accessibility access is
    granted.
 3. `AudioCapture` records 16 kHz mono samples only while Fn is held.
-4. `WhisperKitTranscriber` loads the local Whisper model and transcribes the
+4. `ModelRegistry.inProcessWhisperKitModels` supplies the shipping Settings
+   picker. A valid persisted choice replaces the recommended default on launch.
+5. Model changes start only while dictation is idle. The selected
+   `WhisperKitTranscriber` uses the existing download, load, progress, and error
+   states, and Parakeet remains development-only.
+6. `WhisperKitTranscriber` loads the local Whisper model and transcribes the
    completed sample buffer in process.
-5. `TextInjector` inserts the sanitized result at the active cursor.
-6. The overlay and menu bar item show recording and transcription state.
+7. The injected `TextOutputting` boundary sends the sanitized result through
+   direct CGEvent typing by default or through explicit clipboard paste mode.
+8. Clipboard paste restores all prior item representations only when the
+   pasteboard change count still matches Syrinx's write.
+9. `DictationSession` moves through idle, recording, transcribing, and
+   outputting phases. Each dictation has a monotonically increasing token.
+10. Escape, stop, and quit invalidate the active token, stop capture, cancel
+    owned tasks, and clear the overlay and menu state. A late result cannot pass
+    the token check.
+11. The 60-second recording limit stops capture and starts one transcription.
+12. The overlay and menu bar item show recording and transcription state.
+
+Syrinx does not infer whether an application accepted direct typing. Secure
+fields and some Electron applications can reject synthesized text. The last
+successful transcript stays in process memory for Copy Last Dictation and is
+not stored on disk.
 
 The app does not request Full Disk Access, Screen Recording, Input Monitoring,
 or Automation. It does not start a child model service or send audio to a

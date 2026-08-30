@@ -173,7 +173,7 @@ final class DictationSessionShortcutTests: XCTestCase {
         let session = makeSession(
             factory: factory,
             preferences: preferences,
-            capture: FakeAudioCapture(samples: [0.25])
+            capture: FakeAudioCapture(samples: [Float](repeating: 0.25, count: 4_800))
         )
 
         try await session.prepare()
@@ -181,10 +181,12 @@ final class DictationSessionShortcutTests: XCTestCase {
         let monitor = try XCTUnwrap(factory.monitors.first)
         let transcriptionFinished = expectation(description: "transcription finishes")
         var recordingWasStarted = false
+        var transcriptionWasFinished = false
         session.settingsState.addObserver {
             if !session.settingsState.hotkeyChangeAllowed {
                 recordingWasStarted = true
-            } else if recordingWasStarted {
+            } else if recordingWasStarted && !transcriptionWasFinished {
+                transcriptionWasFinished = true
                 transcriptionFinished.fulfill()
             }
         }
@@ -243,10 +245,10 @@ final class DictationSessionShortcutTests: XCTestCase {
             model: TestModel.model,
             transcriber: TestTranscriber(),
             monitorFactory: { choice in factory.make(choice: choice) },
+            capture: capture,
             preferences: preferences,
             loginItemController: loginItemController,
-            menuBar: menuBar,
-            capture: capture
+            menuBar: menuBar
         )
     }
 }

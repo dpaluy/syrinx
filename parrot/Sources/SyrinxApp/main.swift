@@ -21,8 +21,9 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
-            let model = try Self.requireRecommendedModel()
-            let session = try DictationSession(model: model)
+            let preferences = AppPreferences()
+            let model = try Self.requireSelectedModel(preferences: preferences)
+            let session = try DictationSession(model: model, preferences: preferences)
             self.session = session
             session.setStatus("waiting for permissions")
             Task {
@@ -31,7 +32,7 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             showError(
                 title: "Syrinx could not start",
-                message: "The recommended Whisper model is not available."
+                message: "The selected Whisper model is not available."
             )
         }
     }
@@ -59,9 +60,13 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private static func requireRecommendedModel() throws -> TranscriptionModel {
-        guard let model = ModelRegistry.recommended() else {
-            throw AppError.recommendedModelMissing
+    private static func requireSelectedModel(
+        preferences: AppPreferences
+    ) throws -> TranscriptionModel {
+        guard let model = ModelRegistry.preferredInProcessModel(
+            selectedID: preferences.selectedModelID
+        ) else {
+            throw AppError.selectedModelMissing
         }
         return model
     }
@@ -77,7 +82,7 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 private enum AppError: Error {
-    case recommendedModelMissing
+    case selectedModelMissing
 }
 
 @MainActor

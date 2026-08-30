@@ -5,6 +5,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let state: SettingsState
     private let loginItemController: LoginItemController
     private let onHotkeyChoiceChanged: (HotkeyChoice) -> Bool
+    private let onModelChanged: (TranscriptionModel) -> Void
 
     private let trailingSpaceCheckbox = NSButton(
         checkboxWithTitle: "Add a space after dictation",
@@ -19,6 +20,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let replacementsTextView = NSTextView(frame: .zero)
     private let replacementsScrollView = NSScrollView(frame: .zero)
     private let hotkeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let outputModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let launchAtLoginCheckbox = NSButton(
         checkboxWithTitle: "Launch at login",
         target: nil,
@@ -28,21 +30,23 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let loginItemErrorLabel = NSTextField(labelWithString: "")
     private let shortcutErrorLabel = NSTextField(labelWithString: "")
     private let versionLabel = NSTextField(labelWithString: "")
-    private let modelLabel = NSTextField(labelWithString: "")
+    private let modelPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let modelStateLabel = NSTextField(labelWithString: "")
     private let modelProgress = NSProgressIndicator(frame: .zero)
 
     public init(
         state: SettingsState,
         loginItemController: LoginItemController? = nil,
-        onHotkeyChoiceChanged: @escaping (HotkeyChoice) -> Bool
+        onHotkeyChoiceChanged: @escaping (HotkeyChoice) -> Bool,
+        onModelChanged: @escaping (TranscriptionModel) -> Void = { _ in }
     ) {
         self.state = state
         self.loginItemController = loginItemController ?? LoginItemController()
         self.onHotkeyChoiceChanged = onHotkeyChoiceChanged
+        self.onModelChanged = onModelChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 430),
+            contentRect: NSRect(x: 0, y: 0, width: 430, height: 540),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -67,7 +71,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         state.refreshPreferences()
         let status = loginItemController.refresh()
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
-        loadReplacementsText()
+        refreshUI()
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -108,6 +112,29 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         refreshUI()
     }
 
+    @objc private func outputModeChanged(_ sender: NSPopUpButton) {
+        guard sender.indexOfSelectedItem >= 0,
+              sender.indexOfSelectedItem < TextOutputMode.allCases.count
+        else {
+            refreshUI()
+            return
+        }
+        state.preferences.textOutputMode = TextOutputMode.allCases[sender.indexOfSelectedItem]
+        refreshUI()
+    }
+
+    @objc private func modelChanged(_ sender: NSPopUpButton) {
+        guard state.modelChangeAllowed,
+              sender.indexOfSelectedItem >= 0,
+              sender.indexOfSelectedItem < state.selectableModels.count
+        else {
+            refreshUI()
+            return
+        }
+        onModelChanged(state.selectableModels[sender.indexOfSelectedItem])
+        refreshUI()
+    }
+
     @objc private func launchAtLoginChanged(_ sender: NSButton) {
         let status = loginItemController.setEnabled(sender.state == .on)
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
@@ -138,10 +165,18 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         hotkeyPopup.target = self
         hotkeyPopup.action = #selector(hotkeyChanged(_:))
 
+        outputModePopup.addItems(withTitles: TextOutputMode.allCases.map(\.displayName))
+        outputModePopup.target = self
+        outputModePopup.action = #selector(outputModeChanged(_:))
+
+        modelPopup.addItems(withTitles: state.selectableModels.map(Self.modelTitle))
+        modelPopup.target = self
+        modelPopup.action = #selector(modelChanged(_:))
+
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged(_:))
 
-        for label in [versionLabel, modelLabel, modelStateLabel, loginItemStatusLabel] {
+        for label in [versionLabel, modelStateLabel, loginItemStatusLabel] {
             label.alignment = .left
             label.lineBreakMode = .byTruncatingTail
         }
@@ -179,6 +214,16 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         shortcutRow.distribution = .fill
         hotkeyPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
+        let outputModeRow = NSStackView(views: [
+            NSTextField(labelWithString: "Text output"),
+            outputModePopup,
+        ])
+        outputModeRow.orientation = .horizontal
+        outputModeRow.spacing = 12
+        outputModeRow.alignment = .centerY
+        outputModeRow.distribution = .fill
+        outputModePopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
         let loginRow = NSStackView(views: [launchAtLoginCheckbox, loginItemStatusLabel])
         loginRow.orientation = .horizontal
         loginRow.spacing = 12
@@ -187,6 +232,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
 
         let modelHeader = NSTextField(labelWithString: "Model")
         modelHeader.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+        modelPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let modelStateRow = NSStackView(views: [modelStateLabel, modelProgress])
         modelStateRow.orientation = .horizontal
         modelStateRow.spacing = 8
@@ -202,12 +248,13 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
             replacementsHelp,
             shortcutRow,
             shortcutErrorLabel,
+            outputModeRow,
             loginRow,
             loginItemErrorLabel,
             NSView(),
             versionLabel,
             modelHeader,
-            modelLabel,
+            modelPopup,
             modelStateRow,
         ])
         stack.orientation = .vertical
@@ -225,10 +272,16 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
             replacementsScrollView.heightAnchor.constraint(equalToConstant: 64),
             replacementsHelp.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             shortcutRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            outputModeRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             loginRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            modelPopup.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
             modelStateLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
         ])
+    }
+
+    private static func modelTitle(_ model: TranscriptionModel) -> String {
+        "\(model.displayName) (\(model.id), \(model.sizeMB) MB)"
     }
 
     private func refreshUI() {
@@ -239,12 +292,14 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         }
         hotkeyPopup.selectItem(withTitle: state.hotkeyChoice.displayName)
         hotkeyPopup.isEnabled = state.hotkeyChangeAllowed
+        outputModePopup.selectItem(withTitle: state.preferences.textOutputMode.displayName)
         shortcutErrorLabel.stringValue = state.shortcutError ?? ""
         launchAtLoginCheckbox.state = state.loginItemStatus == .enabled || state.loginItemStatus == .requiresApproval ? .on : .off
         loginItemStatusLabel.stringValue = state.loginItemStatus.displayText
         loginItemErrorLabel.stringValue = state.loginItemOperationError.map { "Error: \($0)" } ?? ""
         versionLabel.stringValue = "Version: \(state.appVersion)"
-        modelLabel.stringValue = "\(state.model.displayName) (\(state.model.id))"
+        modelPopup.selectItem(withTitle: Self.modelTitle(state.model))
+        modelPopup.isEnabled = state.modelChangeAllowed
         modelStateLabel.stringValue = state.modelState.displayText
 
         if case .downloading(let progress) = state.modelState, let progress {

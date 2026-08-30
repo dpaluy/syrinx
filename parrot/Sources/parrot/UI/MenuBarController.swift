@@ -8,8 +8,10 @@ public final class MenuBarController {
     private let statusItem: NSStatusItem
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
-    private let modelID: String
+    private let copyLastDictationItem: NSMenuItem
+    private var modelID: String
     private var settingsAction: (() -> Void)?
+    private var copyLastDictationAction: (() -> Void)?
     private var modelState: ModelLifecycleState?
     private var hotkeyChoice: HotkeyChoice = .fnOrGlobe
     private var isBusy = false
@@ -31,6 +33,15 @@ public final class MenuBarController {
         modelLabel = NSMenuItem(title: "model: \(modelID)", action: nil, keyEquivalent: "")
         modelLabel.isEnabled = false
         menu.addItem(modelLabel)
+
+        copyLastDictationItem = NSMenuItem(
+            title: "Copy Last Dictation",
+            action: #selector(copyLastDictationClicked),
+            keyEquivalent: ""
+        )
+        copyLastDictationItem.target = self
+        copyLastDictationItem.isEnabled = false
+        menu.addItem(copyLastDictationItem)
 
         let settings = NSMenuItem(
             title: "Settings...",
@@ -58,11 +69,20 @@ public final class MenuBarController {
         settingsAction = action
     }
 
+    public func setCopyLastDictationAction(_ action: (() -> Void)?) {
+        copyLastDictationAction = action
+    }
+
+    public func setLastDictationAvailable(_ available: Bool) {
+        copyLastDictationItem.isEnabled = available
+    }
+
     public func bind(to state: SettingsState) {
         state.addObserver { [weak self, weak state] in
             guard let self, let state else { return }
             self.modelState = state.modelState
             self.hotkeyChoice = state.hotkeyChoice
+            self.setModel(state.model)
             self.renderState()
         }
     }
@@ -109,6 +129,11 @@ public final class MenuBarController {
     public func setModelState(_ state: ModelLifecycleState) {
         modelState = state
         renderState()
+    }
+
+    public func setModel(_ model: TranscriptionModel) {
+        modelID = model.id
+        modelLabel.title = "model: \(model.id)"
     }
 
     public func setHotkeyChoice(_ choice: HotkeyChoice) {
@@ -178,5 +203,9 @@ public final class MenuBarController {
 
     @objc private func settingsClicked() {
         settingsAction?()
+    }
+
+    @objc private func copyLastDictationClicked() {
+        copyLastDictationAction?()
     }
 }

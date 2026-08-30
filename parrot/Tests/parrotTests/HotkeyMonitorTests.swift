@@ -40,6 +40,17 @@ final class HotkeyMonitorTests: XCTestCase {
         XCTAssertTrue(events.isEmpty)
     }
 
+    func testMonitorEmitsCancelForEscapeKeyDownOnly() throws {
+        let monitor = HotkeyMonitor(choice: .fnOrGlobe)
+        var events: [HotkeyMonitor.Event] = []
+        try monitor.handleForTesting { events.append($0) }
+
+        monitor.handle(type: .keyDown, event: event(keyCode: 53, flags: []))
+        monitor.handle(type: .keyUp, event: event(keyCode: 53, flags: []))
+
+        XCTAssertEqual(events, [.cancel])
+    }
+
     func testRightCommandReleaseUsesSelectedPhysicalKeyWithLeftCommandHeld() throws {
         let monitor = HotkeyMonitor(choice: .rightCommand)
         var events: [HotkeyMonitor.Event] = []

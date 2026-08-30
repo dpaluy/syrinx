@@ -39,7 +39,8 @@ public enum ModelLifecycleState: Equatable, Sendable {
 
 @MainActor
 public final class SettingsState {
-    public let model: TranscriptionModel
+    public private(set) var model: TranscriptionModel
+    public let selectableModels: [TranscriptionModel]
     public let appVersion: String
     public let preferences: AppPreferences
 
@@ -48,12 +49,14 @@ public final class SettingsState {
     public private(set) var loginItemOperationError: String?
     public private(set) var hotkeyChoice: HotkeyChoice
     public private(set) var hotkeyChangeAllowed = true
+    public private(set) var modelChangeAllowed = true
     public private(set) var shortcutError: String?
 
     private var observers: [() -> Void] = []
 
     public init(
         model: TranscriptionModel,
+        selectableModels: [TranscriptionModel] = ModelRegistry.inProcessWhisperKitModels,
         appVersion: String = AppVersion.current(),
         preferences: AppPreferences = AppPreferences(),
         modelState: ModelLifecycleState = .checking,
@@ -61,6 +64,7 @@ public final class SettingsState {
         loginItemOperationError: String? = nil
     ) {
         self.model = model
+        self.selectableModels = selectableModels
         self.appVersion = appVersion
         self.preferences = preferences
         self.modelState = modelState
@@ -85,6 +89,12 @@ public final class SettingsState {
         notifyObservers()
     }
 
+    public func setModel(_ model: TranscriptionModel) {
+        guard self.model.id != model.id else { return }
+        self.model = model
+        notifyObservers()
+    }
+
     public func setHotkeyChoice(_ choice: HotkeyChoice) {
         guard hotkeyChoice != choice else { return }
         hotkeyChoice = choice
@@ -104,6 +114,12 @@ public final class SettingsState {
     public func setHotkeyChangeAllowed(_ allowed: Bool) {
         guard hotkeyChangeAllowed != allowed else { return }
         hotkeyChangeAllowed = allowed
+        notifyObservers()
+    }
+
+    public func setModelChangeAllowed(_ allowed: Bool) {
+        guard modelChangeAllowed != allowed else { return }
+        modelChangeAllowed = allowed
         notifyObservers()
     }
 
