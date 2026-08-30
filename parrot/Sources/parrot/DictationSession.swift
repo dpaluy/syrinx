@@ -305,7 +305,7 @@ public final class DictationSession {
             settingsState.setHotkeyChangeAllowed(false)
             overlay.show(.transcribing)
             menuBar.setTranscribing()
-            guard !samples.isEmpty else {
+            guard UtteranceAcceptancePolicy.accepts(sampleCount: samples.count) else {
                 overlay.hide()
                 menuBar.setRecording(false)
                 settingsState.setHotkeyChangeAllowed(true)
@@ -318,7 +318,9 @@ public final class DictationSession {
                     let text = try await transcriber.transcribe(samples)
                     if let output = TextOutputPolicy.output(
                         for: text,
-                        addTrailingSpace: preferences.addTrailingSpace
+                        addTrailingSpace: preferences.addTrailingSpace,
+                        literalReplacements: preferences.literalReplacements,
+                        spokenPunctuationEnabled: preferences.spokenPunctuationEnabled
                     ) {
                         TextInjector.inject(output)
                     }
