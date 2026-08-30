@@ -114,6 +114,74 @@ final class DictationSessionModelTests: XCTestCase {
         XCTAssertEqual(states.last, .ready)
     }
 
+    func testSuccessfulModelChangeAfterInitialPreparationFailureStartsListening() async throws {
+        let initial = try XCTUnwrap(ModelRegistry.recommended())
+        let selected = try XCTUnwrap(ModelRegistry.find("whisper-small.en"))
+        let monitor = ModelHotkeyMonitor()
+        let capture = ModelAudioCapture(results: [[0.1]])
+        let factory = ModelTestTranscriberFactory { model in
+            ImmediateModelTranscriber(modelID: model.id)
+        }
+        let session = makeSession(
+            initialModel: initial,
+            initialTranscriber: FailingModelTranscriber(modelID: initial.id),
+            factory: factory,
+            preferences: AppPreferences(defaults: defaults),
+            monitor: monitor,
+            capture: capture
+        )
+
+        do {
+            try await session.prepare()
+            XCTFail("Expected initial model preparation to fail")
+        } catch {
+            // Expected launch-time preparation failure.
+        }
+
+        let changed = await session.setModel(selected)
+        XCTAssertTrue(changed)
+        monitor.send(.pressed)
+
+        XCTAssertEqual(session.phase, .recording)
+        session.stop()
+    }
+
+    func testFailedModelCanBeRetriedInPlace() async throws {
+        let initial = try XCTUnwrap(ModelRegistry.recommended())
+        let selected = try XCTUnwrap(ModelRegistry.find("whisper-large-v3-turbo"))
+        let retryingTranscriber = RetryingModelTranscriber(modelID: selected.id)
+        let factory = ModelTestTranscriberFactory { model in
+            if model.id == selected.id {
+                return retryingTranscriber
+            }
+            return ImmediateModelTranscriber(modelID: model.id)
+        }
+        let preferences = AppPreferences(defaults: defaults)
+        let session = makeSession(
+            initialModel: initial,
+            initialTranscriber: factory.make(initial),
+            factory: factory,
+            preferences: preferences
+        )
+        try await session.prepare()
+        try session.start()
+
+        let changed = await session.setModel(selected)
+        XCTAssertFalse(changed)
+        if case .failed = session.settingsState.modelState {
+            // Expected first preparation failure.
+        } else {
+            XCTFail("Expected selected-model preparation failure")
+        }
+
+        let recovered = await session.setModel(selected)
+        XCTAssertTrue(recovered)
+        XCTAssertEqual(session.settingsState.modelState, ModelLifecycleState.ready)
+        let preparationCount = await retryingTranscriber.prepareCount
+        XCTAssertEqual(preparationCount, 2)
+        session.stop()
+    }
+
     func testFailedSelectedModelUsesFailureStateAndCanBeChangedAgain() async throws {
         let initial = try XCTUnwrap(ModelRegistry.recommended())
         let selected = try XCTUnwrap(ModelRegistry.find("whisper-large-v3-turbo"))
@@ -290,6 +358,26 @@ private struct FailingModelTranscriber: Transcriber {
 
     func prepare() async throws {
         throw ModelTestError.preparationFailed
+    }
+
+    func transcribe(_ audio: [Float]) async throws -> String {
+        ""
+    }
+}
+
+private actor RetryingModelTranscriber: Transcriber {
+    let modelID: String
+    private(set) var prepareCount = 0
+
+    init(modelID: String) {
+        self.modelID = modelID
+    }
+
+    func prepare() async throws {
+        prepareCount += 1
+        if prepareCount == 1 {
+            throw ModelTestError.preparationFailed
+        }
     }
 
     func transcribe(_ audio: [Float]) async throws -> String {

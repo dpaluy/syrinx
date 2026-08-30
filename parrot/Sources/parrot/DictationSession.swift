@@ -191,7 +191,20 @@ public final class DictationSession {
                   $0.id == requestedModel.id
               })
         else { return false }
-        guard selectedModel.id != model.id else { return true }
+        if selectedModel.id == model.id {
+            guard !prepared || !started else { return true }
+            setModelChangeInProgress(true)
+            defer { setModelChangeInProgress(false) }
+            do {
+                if !prepared {
+                    try await prepareCurrentModel()
+                }
+                try startIfNeeded()
+                return true
+            } catch {
+                return false
+            }
+        }
 
         let candidate: any Transcriber
         do {
@@ -211,9 +224,23 @@ public final class DictationSession {
 
         do {
             try await prepareCurrentModel()
+            try startIfNeeded()
             return true
         } catch {
             return false
+        }
+    }
+
+    private func startIfNeeded() throws {
+        guard !started else { return }
+        do {
+            try start()
+        } catch {
+            if settingsState.shortcutError == nil {
+                settingsState.setShortcutError("Could not start listening")
+            }
+            menuBar.setStatus("could not start")
+            throw error
         }
     }
 

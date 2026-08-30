@@ -57,9 +57,17 @@ public final class ConfiguredTextOutput: TextOutputting {
 public final class ClipboardPasteTextOutput: TextOutputting {
     typealias RestoreScheduler = (@escaping () -> Void) -> Void
 
+    private struct PendingRestore {
+        let generation: UInt64
+        let changeCount: Int
+        let snapshot: PasteboardSnapshot
+    }
+
     private let pasteboard: NSPasteboard
     private let pasteAction: () -> Void
     private let scheduleRestore: RestoreScheduler
+    private var restoreGeneration: UInt64 = 0
+    private var pendingRestore: PendingRestore?
 
     public convenience init() {
         self.init(
@@ -83,19 +91,35 @@ public final class ClipboardPasteTextOutput: TextOutputting {
 
     public func output(_ text: String) {
         guard !text.isEmpty else { return }
-        let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
+        restoreGeneration &+= 1
+        let generation = restoreGeneration
+        let snapshot = pendingRestore?.snapshot ?? PasteboardSnapshot(pasteboard: pasteboard)
         pasteboard.clearContents()
         guard pasteboard.setString(text, forType: .string) else {
+            pendingRestore = nil
             snapshot.restore(to: pasteboard)
             return
         }
 
         let syrinxChangeCount = pasteboard.changeCount
+        pendingRestore = PendingRestore(
+            generation: generation,
+            changeCount: syrinxChangeCount,
+            snapshot: snapshot
+        )
         pasteAction()
-        scheduleRestore { [pasteboard] in
-            guard pasteboard.changeCount == syrinxChangeCount else { return }
-            snapshot.restore(to: pasteboard)
+        scheduleRestore { [weak self] in
+            self?.restorePending(generation: generation)
         }
+    }
+
+    private func restorePending(generation: UInt64) {
+        guard let pendingRestore,
+              pendingRestore.generation == generation
+        else { return }
+        self.pendingRestore = nil
+        guard pasteboard.changeCount == pendingRestore.changeCount else { return }
+        pendingRestore.snapshot.restore(to: pasteboard)
     }
 
     private static func postPasteShortcut() {
