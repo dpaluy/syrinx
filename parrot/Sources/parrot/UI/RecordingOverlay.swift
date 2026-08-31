@@ -13,42 +13,42 @@ public final class RecordingOverlay {
 
     private var window: NSPanel?
     private let model = OverlayModel()
+    private var pendingHide: DispatchWorkItem?
 
     public func show(_ state: State) {
+        pendingHide?.cancel()
+        pendingHide = nil
         ensureWindow()
-        if state == .recording {
-            model.resetLevels()
-        }
         guard let window else { return }
-        let needsAppear = !window.isVisible
-        if needsAppear {
-            positionAtBottomCenter(window)
-            window.orderFrontRegardless()
-            // Defer the state change so SwiftUI lays out in the .hidden style
-            // first, then animates to the visible style on the next runloop tick.
-            DispatchQueue.main.async { [model] in
-                model.state = state
-            }
-        } else {
-            model.state = state
-        }
+        model.state = state
+        positionAtBottomCenter(window)
+        window.orderFrontRegardless()
     }
 
     public func hide() {
+        pendingHide?.cancel()
         model.state = .hidden
         // Let the SwiftUI scale+fade animation play out before yanking the
-        // window  -  otherwise it just pops away.
-        let window = self.window
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            window?.orderOut(nil)
+        // window. A later show cancels this work item.
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.model.state == .hidden else { return }
+            self.window?.orderOut(nil)
+            self.pendingHide = nil
         }
+        pendingHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
 
-    /// Push a new audio level (0…~1). Safe to call from any thread.
-    public nonisolated func pushLevel(_ level: Float) {
-        Task { @MainActor in
-            self.model.pushLevel(level)
-        }
+    /// Compatibility hook for audio capture. The three-dot animation is fixed.
+    public nonisolated func pushLevel(_: Float) {}
+
+    internal var isVisibleForTesting: Bool { window?.isVisible == true }
+
+    internal func hideImmediatelyForTesting() {
+        pendingHide?.cancel()
+        pendingHide = nil
+        model.state = .hidden
+        window?.orderOut(nil)
     }
 
     private func ensureWindow() {
@@ -89,28 +89,9 @@ public final class RecordingOverlay {
 /// Observable state for the SwiftUI pill.
 @MainActor
 final class OverlayModel: ObservableObject {
-    static let barCount = 6
-    /// Per-bar height multiplier  -  center bars peak higher than edge bars.
-    private static let envelope: [Float] = [0.55, 0.85, 1.0, 1.0, 0.85, 0.55]
+    static let indicatorCount = 3
 
     @Published var state: RecordingOverlay.State = .hidden
-    @Published var levels: [Float] = Array(repeating: 0, count: barCount)
-
-    func pushLevel(_ level: Float) {
-        let shaped = min(1.0, sqrt(max(0, level)) * 3.4)
-        var next = [Float]()
-        next.reserveCapacity(Self.barCount)
-        for i in 0..<Self.barCount {
-            // Small per-bar jitter so the bars don't all move in lockstep.
-            let jitter = Float.random(in: 0.78...1.0)
-            next.append(shaped * Self.envelope[i] * jitter)
-        }
-        levels = next
-    }
-
-    func resetLevels() {
-        levels = Array(repeating: 0, count: Self.barCount)
-    }
 }
 
 private struct OverlayPill: View {
@@ -135,7 +116,7 @@ private struct OverlayPill: View {
     private var content: some View {
         switch model.state {
         case .hidden, .recording:
-            Waveform(levels: model.levels)
+            ListeningDots()
                 .frame(width: 54, height: 22)
         case .transcribing:
             ProgressView()
@@ -146,20 +127,28 @@ private struct OverlayPill: View {
     }
 }
 
-private struct Waveform: View {
-    let levels: [Float]
+private struct ListeningDots: View {
+    @State private var animating = false
     private let color = Color(red: 181/255.0, green: 209/255.0, blue: 255/255.0)
 
     var body: some View {
-        HStack(alignment: .center, spacing: 4) {
-            ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
-                Capsule()
+        HStack(alignment: .center, spacing: 6) {
+            ForEach(0..<OverlayModel.indicatorCount, id: \.self) { index in
+                Circle()
                     .fill(color)
-                    .frame(width: 2.5)
-                    .frame(maxHeight: .infinity)
-                    .scaleEffect(y: max(0.10, CGFloat(level)), anchor: .center)
-                    .animation(.easeOut(duration: 0.09), value: level)
+                    .frame(width: 6, height: 6)
+                    .scaleEffect(animating ? 1 : 0.55)
+                    .opacity(animating ? 1 : 0.45)
+                    .animation(
+                        .easeInOut(duration: 0.55)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.16),
+                        value: animating
+                    )
             }
+        }
+        .onAppear {
+            animating = true
         }
     }
 }
