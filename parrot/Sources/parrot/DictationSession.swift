@@ -24,6 +24,7 @@ public final class DictationSession {
     public enum SessionError: Error {
         case alreadyStarted
         case modelNotReady
+        case permissionsRequired
         case shortcutRegistrationFailed
     }
 
@@ -47,6 +48,8 @@ public final class DictationSession {
     private let recordingLimitWait: @Sendable (Duration) async throws -> Void
     private let loginItemController: LoginItemController
     private let modelStateRelay: ModelStateRelay
+    private let onPermissionRecovery: (SyrinxPermissionPane) -> Void
+    private let onPermissionRecheck: () -> Void
     public let settingsState: SettingsState
     private var started = false
     private var prepared = false
@@ -69,13 +72,17 @@ public final class DictationSession {
                 Task { @MainActor [weak self] in
                     _ = await self?.setModel(model)
                 }
-            }
+            },
+            onPermissionRecovery: onPermissionRecovery,
+            onPermissionRecheck: onPermissionRecheck
         )
     }()
 
     public init(
         model: TranscriptionModel,
-        preferences: AppPreferences = AppPreferences()
+        preferences: AppPreferences = AppPreferences(),
+        onPermissionRecovery: @escaping (SyrinxPermissionPane) -> Void = { _ in },
+        onPermissionRecheck: @escaping () -> Void = {}
     ) throws {
         let settingsState = SettingsState(
             model: model,
@@ -114,6 +121,8 @@ public final class DictationSession {
         self.recordingLimitWait = { try await Task.sleep(for: $0) }
         self.loginItemController = LoginItemController()
         self.modelStateRelay = modelStateRelay
+        self.onPermissionRecovery = onPermissionRecovery
+        self.onPermissionRecheck = onPermissionRecheck
         self.settingsState = settingsState
         self.workingHotkeyChoice = preferences.hotkeyChoice
 
@@ -144,13 +153,17 @@ public final class DictationSession {
         recordingLimitWait: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
         },
-        transcriberFactory: ModelTranscriberFactory? = nil
+        transcriberFactory: ModelTranscriberFactory? = nil,
+        permissionState: SyrinxPermissionState = .granted,
+        onPermissionRecovery: @escaping (SyrinxPermissionPane) -> Void = { _ in },
+        onPermissionRecheck: @escaping () -> Void = {}
     ) {
         let settingsState = SettingsState(
             model: model,
             appVersion: AppVersion.current(),
             preferences: preferences,
-            loginItemStatus: loginItemController.status
+            loginItemStatus: loginItemController.status,
+            permissionState: permissionState
         )
         let modelStateRelay = ModelStateRelay()
         let stateHandler: @Sendable (ModelLifecycleState) -> Void = { state in
@@ -176,6 +189,8 @@ public final class DictationSession {
         self.recordingLimitWait = recordingLimitWait
         self.loginItemController = loginItemController
         self.modelStateRelay = modelStateRelay
+        self.onPermissionRecovery = onPermissionRecovery
+        self.onPermissionRecheck = onPermissionRecheck
         self.settingsState = settingsState
         self.workingHotkeyChoice = preferences.hotkeyChoice
 
@@ -286,6 +301,23 @@ public final class DictationSession {
         settingsWindow.showSettings()
     }
 
+    public func updatePermissions(_ state: SyrinxPermissionState) {
+        settingsState.setPermissionState(state)
+        guard let reason = state.recordingUnavailableReason else { return }
+        if started || phase != .idle {
+            stop()
+        }
+        menuBar.setStatus(reason)
+    }
+
+    public func resumeAfterPermissionRecovery() throws {
+        guard settingsState.permissionState.allGranted else {
+            throw SessionError.permissionsRequired
+        }
+        guard prepared else { return }
+        try startIfNeeded()
+    }
+
     @discardableResult
     func copyLastDictation() -> Bool {
         guard let lastDictation else { return false }
@@ -296,6 +328,9 @@ public final class DictationSession {
     public func start() throws {
         guard !started else { throw SessionError.alreadyStarted }
         guard prepared else { throw SessionError.modelNotReady }
+        guard settingsState.permissionState.allGranted else {
+            throw SessionError.permissionsRequired
+        }
         let selectedChoice = preferences.hotkeyChoice
         monitor.stop()
         do {
@@ -449,7 +484,12 @@ public final class DictationSession {
     }
 
     private func beginRecording() {
-        guard started, prepared, !modelChangeInProgress, phase == .idle else { return }
+        guard started,
+              prepared,
+              settingsState.permissionState.allGranted,
+              !modelChangeInProgress,
+              phase == .idle
+        else { return }
         let token = nextSessionToken()
         do {
             try capture.start()

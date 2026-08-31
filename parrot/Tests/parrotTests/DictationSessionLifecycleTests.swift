@@ -3,6 +3,41 @@ import XCTest
 
 @MainActor
 final class DictationSessionLifecycleTests: XCTestCase {
+    func testMissingPermissionStopsAndBlocksRecordingUntilRecovery() async throws {
+        let capture = LifecycleAudioCapture(results: [[Float](repeating: 0.1, count: 4_800)])
+        let monitor = LifecycleHotkeyMonitor()
+        let session = makeSession(
+            transcriber: CountingSessionTranscriber(text: "blocked"),
+            output: LifecycleRecordingOutput(),
+            capture: capture,
+            monitor: monitor
+        )
+        try await session.prepare()
+        try session.start()
+
+        session.updatePermissions(SyrinxPermissionState(
+            microphone: .denied,
+            accessibility: .granted
+        ))
+        monitor.send(.pressed)
+
+        XCTAssertFalse(monitor.isRunning)
+        XCTAssertEqual(session.phase, .idle)
+        XCTAssertEqual(capture.startCount, 0)
+        XCTAssertEqual(
+            session.settingsState.recordingUnavailableReason,
+            "Microphone permission required"
+        )
+
+        session.updatePermissions(.granted)
+        try session.resumeAfterPermissionRecovery()
+        monitor.send(.pressed)
+
+        XCTAssertTrue(monitor.isRunning)
+        XCTAssertEqual(session.phase, .recording)
+        XCTAssertEqual(capture.startCount, 1)
+    }
+
     func testCancelDuringTranscriptionSuppressesLateResult() async throws {
         let transcriber = DeferredSessionTranscriber()
         let output = LifecycleRecordingOutput()
@@ -236,6 +271,7 @@ private final class LifecycleAudioCapture: AudioCapturing {
     var onLevel: ((Float) -> Void)?
     private var results: [[Float]]
     private var isRecording = false
+    private(set) var startCount = 0
     private(set) var stopCount = 0
 
     init(results: [[Float]]) {
@@ -244,6 +280,7 @@ private final class LifecycleAudioCapture: AudioCapturing {
 
     func start() throws {
         isRecording = true
+        startCount += 1
     }
 
     func stop() -> [Float] {

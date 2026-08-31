@@ -6,6 +6,8 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let loginItemController: LoginItemController
     private let onHotkeyChoiceChanged: (HotkeyChoice) -> Bool
     private let onModelChanged: (TranscriptionModel) -> Void
+    private let onPermissionRecovery: (SyrinxPermissionPane) -> Void
+    private let onPermissionRecheck: () -> Void
     private let activeScreenVisibleFrame: () -> NSRect?
 
     private let spokenPunctuationCheckbox = NSButton(
@@ -29,12 +31,20 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     private let modelPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let modelStateLabel = NSTextField(labelWithString: "")
     private let modelProgress = NSProgressIndicator(frame: .zero)
+    private let microphonePermissionLabel = NSTextField(labelWithString: "")
+    private let accessibilityPermissionLabel = NSTextField(labelWithString: "")
+    private let microphonePermissionHelp = NSTextField(wrappingLabelWithString: "")
+    private let accessibilityPermissionHelp = NSTextField(wrappingLabelWithString: "")
+    private let microphoneRecoveryButton = NSButton(title: "", target: nil, action: nil)
+    private let accessibilityRecoveryButton = NSButton(title: "", target: nil, action: nil)
 
     public init(
         state: SettingsState,
         loginItemController: LoginItemController? = nil,
         onHotkeyChoiceChanged: @escaping (HotkeyChoice) -> Bool,
         onModelChanged: @escaping (TranscriptionModel) -> Void = { _ in },
+        onPermissionRecovery: @escaping (SyrinxPermissionPane) -> Void = { _ in },
+        onPermissionRecheck: @escaping () -> Void = {},
         activeScreenVisibleFrame: @escaping () -> NSRect? = {
             NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame
         }
@@ -43,6 +53,8 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         self.loginItemController = loginItemController ?? LoginItemController()
         self.onHotkeyChoiceChanged = onHotkeyChoiceChanged
         self.onModelChanged = onModelChanged
+        self.onPermissionRecovery = onPermissionRecovery
+        self.onPermissionRecheck = onPermissionRecheck
         self.activeScreenVisibleFrame = activeScreenVisibleFrame
 
         let window = NSWindow(
@@ -79,6 +91,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     }
 
     public func showSettings() {
+        onPermissionRecheck()
         state.refreshPreferences()
         let status = loginItemController.refresh()
         state.setLoginItemStatus(status, operationError: loginItemController.operationError)
@@ -152,6 +165,14 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         shortcutButton.cancelRecording()
     }
 
+    @objc private func recoverMicrophonePermission(_ sender: NSButton) {
+        onPermissionRecovery(.microphone)
+    }
+
+    @objc private func recoverAccessibilityPermission(_ sender: NSButton) {
+        onPermissionRecovery(.accessibility)
+    }
+
     private func configureControls() {
         spokenPunctuationCheckbox.target = self
         spokenPunctuationCheckbox.action = #selector(spokenPunctuationChanged(_:))
@@ -199,6 +220,17 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginChanged(_:))
 
+        microphoneRecoveryButton.target = self
+        microphoneRecoveryButton.action = #selector(recoverMicrophonePermission(_:))
+        accessibilityRecoveryButton.target = self
+        accessibilityRecoveryButton.action = #selector(recoverAccessibilityPermission(_:))
+
+        for label in [microphonePermissionHelp, accessibilityPermissionHelp] {
+            label.textColor = .secondaryLabelColor
+            label.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            label.maximumNumberOfLines = 0
+        }
+
         for label in [versionLabel, loginItemStatusLabel] {
             label.alignment = .left
             label.lineBreakMode = .byTruncatingTail
@@ -243,6 +275,15 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         modelStateRow.alignment = .top
         modelProgress.setContentHuggingPriority(.required, for: .horizontal)
 
+        let microphonePermissionRow = makePermissionRow(
+            label: microphonePermissionLabel,
+            button: microphoneRecoveryButton
+        )
+        let accessibilityPermissionRow = makePermissionRow(
+            label: accessibilityPermissionLabel,
+            button: accessibilityRecoveryButton
+        )
+
         let sections = [
             makeSection(
                 title: "Dictation behavior",
@@ -258,7 +299,14 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
             ),
             makeSection(
                 title: "Permissions and startup",
-                views: [loginRow, loginItemErrorLabel]
+                views: [
+                    microphonePermissionRow,
+                    microphonePermissionHelp,
+                    accessibilityPermissionRow,
+                    accessibilityPermissionHelp,
+                    loginRow,
+                    loginItemErrorLabel,
+                ]
             ),
             makeSection(
                 title: "Model",
@@ -343,6 +391,18 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         return row
     }
 
+    private func makePermissionRow(label: NSTextField, button: NSButton) -> NSStackView {
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = NSStackView(views: [label, button])
+        row.orientation = .horizontal
+        row.spacing = 12
+        row.alignment = .centerY
+        row.distribution = .fill
+        return row
+    }
+
     private static func modelTitle(_ model: TranscriptionModel) -> String {
         "\(model.displayName) (\(model.id), \(model.sizeMB) MB)"
     }
@@ -369,6 +429,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         modelPopup.isEnabled = state.modelChangeAllowed
         modelStateLabel.stringValue = state.modelState.displayText
         shortcutErrorLabel.isHidden = state.shortcutError == nil
+        refreshPermissionUI()
 
         if case .downloading(let progress) = state.modelState, let progress {
             modelProgress.isIndeterminate = false
@@ -381,6 +442,43 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         } else {
             modelProgress.stopAnimation(nil)
         }
+    }
+
+    private func refreshPermissionUI() {
+        let permissionState = state.permissionState
+        microphonePermissionLabel.stringValue =
+            "Microphone: \(permissionState.microphone.displayText)"
+        accessibilityPermissionLabel.stringValue =
+            "Accessibility: \(permissionState.accessibility.displayText)"
+        configureRecovery(
+            pane: .microphone,
+            button: microphoneRecoveryButton,
+            help: microphonePermissionHelp,
+            instruction: "Syrinx needs Microphone access to record dictation."
+        )
+        configureRecovery(
+            pane: .accessibility,
+            button: accessibilityRecoveryButton,
+            help: accessibilityPermissionHelp,
+            instruction: "Syrinx needs Accessibility access to detect the shortcut and insert text."
+        )
+    }
+
+    private func configureRecovery(
+        pane: SyrinxPermissionPane,
+        button: NSButton,
+        help: NSTextField,
+        instruction: String
+    ) {
+        guard let title = state.permissionState.recoveryTitle(for: pane) else {
+            button.isHidden = true
+            help.isHidden = true
+            return
+        }
+        button.title = title
+        button.isHidden = false
+        help.stringValue = instruction
+        help.isHidden = false
     }
 
     private var isEditingReplacements: Bool {

@@ -18,12 +18,22 @@ struct SyrinxApplication {
 @MainActor
 final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
     private var session: DictationSession?
+    private var initialStartComplete = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
             let preferences = AppPreferences()
             let model = try Self.requireSelectedModel(preferences: preferences)
-            let session = try DictationSession(model: model, preferences: preferences)
+            let session = try DictationSession(
+                model: model,
+                preferences: preferences,
+                onPermissionRecovery: { [weak self] pane in
+                    self?.recoverPermission(pane)
+                },
+                onPermissionRecheck: { [weak self] in
+                    self?.recheckPermissions()
+                }
+            )
             self.session = session
             session.setStatus("waiting for permissions")
             Task {
@@ -41,9 +51,17 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
         session?.stop()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard initialStartComplete else { return }
+        recheckPermissions()
+    }
+
     private func start(session: DictationSession) async {
-        guard await PermissionFlow.requestAccess() else {
-            session.setStatus("permissions required")
+        defer { initialStartComplete = true }
+        let accessGranted = await PermissionFlow.requestAccess()
+        let permissionState = PermissionFlow.currentState()
+        session.updatePermissions(permissionState)
+        guard accessGranted, permissionState.allGranted else {
             return
         }
 
@@ -57,6 +75,25 @@ final class SyrinxAppDelegate: NSObject, NSApplicationDelegate {
                 title: "Syrinx could not start",
                 message: "Syrinx could not load the local Whisper model or register the selected shortcut. Check Microphone and Accessibility access, then verify the selected shortcut is available."
             )
+        }
+    }
+
+    private func recoverPermission(_ pane: SyrinxPermissionPane) {
+        Task {
+            await PermissionFlow.recover(pane)
+            recheckPermissions()
+        }
+    }
+
+    private func recheckPermissions() {
+        guard let session else { return }
+        let state = PermissionFlow.currentState()
+        session.updatePermissions(state)
+        guard state.allGranted else { return }
+        do {
+            try session.resumeAfterPermissionRecovery()
+        } catch {
+            session.setStatus("could not resume")
         }
     }
 
@@ -147,6 +184,39 @@ private enum PermissionFlow {
             case .openSettings, .recheck, .cancel:
                 return false
             }
+        }
+    }
+
+    static func currentState() -> SyrinxPermissionState {
+        let microphone: SyrinxPermissionStatus
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            microphone = .granted
+        case .notDetermined:
+            microphone = .notDetermined
+        case .denied:
+            microphone = .denied
+        case .restricted:
+            microphone = .restricted
+        @unknown default:
+            microphone = .restricted
+        }
+        return SyrinxPermissionState(
+            microphone: microphone,
+            accessibility: AXIsProcessTrusted() ? .granted : .denied
+        )
+    }
+
+    static func recover(_ pane: SyrinxPermissionPane) async {
+        switch pane {
+        case .microphone:
+            if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+                _ = await requestMicrophoneIfNeeded()
+            } else {
+                _ = openSettings(anchor: settingsAnchor(for: .microphone))
+            }
+        case .accessibility:
+            _ = openSettings(anchor: settingsAnchor(for: .accessibility))
         }
     }
 

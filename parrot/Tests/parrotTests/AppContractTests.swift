@@ -2,6 +2,42 @@ import XCTest
 @testable import SyrinxClient
 
 final class AppContractTests: XCTestCase {
+    func testPermissionStateNamesMissingAccessAndRequiredRecovery() {
+        let state = SyrinxPermissionState(
+            microphone: .denied,
+            accessibility: .granted
+        )
+
+        XCTAssertFalse(state.allGranted)
+        XCTAssertEqual(state.recordingUnavailableReason, "Microphone permission required")
+        XCTAssertEqual(state.microphone.displayText, "Not allowed")
+        XCTAssertEqual(
+            state.recoveryTitle(for: .microphone),
+            "Open Microphone Settings"
+        )
+        XCTAssertNil(state.recoveryTitle(for: .accessibility))
+    }
+
+    func testPermissionStateReportsBothMissingPermissions() {
+        let state = SyrinxPermissionState(
+            microphone: .notDetermined,
+            accessibility: .denied
+        )
+
+        XCTAssertEqual(
+            state.recordingUnavailableReason,
+            "Microphone and Accessibility permissions required"
+        )
+        XCTAssertEqual(
+            state.recoveryTitle(for: .microphone),
+            "Request Microphone Access"
+        )
+        XCTAssertEqual(
+            state.recoveryTitle(for: .accessibility),
+            "Open Accessibility Settings"
+        )
+    }
+
     func testSyrinxIdentityAndRuntimeRequirementsAreStable() {
         XCTAssertEqual(SyrinxAppInfo.productName, "Syrinx")
         XCTAssertEqual(SyrinxAppInfo.executableName, "syrinx")
