@@ -40,6 +40,43 @@ final class HotkeyMonitorTests: XCTestCase {
         XCTAssertTrue(events.isEmpty)
     }
 
+    func testMonitorEmitsEdgesForRecordedKeyChord() throws {
+        let choice = HotkeyChoice(
+            keyCode: 0,
+            requiredFlags: [.maskShift, .maskCommand],
+            keyLabel: "A"
+        )
+        let monitor = HotkeyMonitor(choice: choice)
+        var events: [HotkeyMonitor.Event] = []
+        try monitor.handleForTesting { events.append($0) }
+
+        monitor.handle(
+            type: .keyDown,
+            event: event(keyCode: choice.keyCode, flags: choice.requiredFlags)
+        )
+        monitor.handle(
+            type: .keyDown,
+            event: event(keyCode: choice.keyCode, flags: choice.requiredFlags)
+        )
+        monitor.handle(type: .keyUp, event: event(keyCode: choice.keyCode, flags: []))
+
+        XCTAssertEqual(events, [.pressed, .released])
+    }
+
+    func testMonitorAcceptsUnmodifiedStandaloneKeyAndRejectsExtraModifiers() throws {
+        let choice = HotkeyChoice(keyCode: 96, requiredFlags: [], keyLabel: "F5")
+        let monitor = HotkeyMonitor(choice: choice)
+        var events: [HotkeyMonitor.Event] = []
+        try monitor.handleForTesting { events.append($0) }
+
+        monitor.handle(type: .keyDown, event: event(keyCode: 96, flags: .maskCommand))
+        monitor.handle(type: .keyUp, event: event(keyCode: 96, flags: []))
+        monitor.handle(type: .keyDown, event: event(keyCode: 96, flags: .maskSecondaryFn))
+        monitor.handle(type: .keyUp, event: event(keyCode: 96, flags: []))
+
+        XCTAssertEqual(events, [.pressed, .released])
+    }
+
     func testMonitorEmitsCancelForEscapeKeyDownOnly() throws {
         let monitor = HotkeyMonitor(choice: .fnOrGlobe)
         var events: [HotkeyMonitor.Event] = []

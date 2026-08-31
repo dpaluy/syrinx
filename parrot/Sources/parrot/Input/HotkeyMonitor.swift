@@ -20,7 +20,7 @@ internal protocol EventTapLifecycle: AnyObject {
     func isEnabled(_ registration: any EventTapRegistration) -> Bool
 }
 
-/// Watches a single modifier key and emits press/release edges.
+/// Watches one recorded shortcut and emits press/release edges.
 /// Requires Accessibility permission. If the tap fails to register, callers
 /// will see an error from `start()`.
 public final class HotkeyMonitor: HotkeyMonitoring {
@@ -111,19 +111,37 @@ public final class HotkeyMonitor: HotkeyMonitoring {
                 ))
         }
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        if type == .keyDown, keyCode == 53 {
+        if type == .keyDown, keyCode == 53, choice.keyCode != 53 {
             onEvent?(.cancel)
             return
         }
-        guard type == .flagsChanged else { return }
         guard keyCode == Int64(choice.keyCode) else { return }
-        if isPressed {
-            isPressed = false
-            onEvent?(.released)
-        } else {
-            guard event.flags.contains(choice.requiredFlags) else { return }
+
+        if choice.isModifierOnly {
+            guard type == .flagsChanged else { return }
+            if isPressed {
+                isPressed = false
+                onEvent?(.released)
+            } else if choice.matches(event.flags) {
+                isPressed = true
+                onEvent?(.pressed)
+            }
+            return
+        }
+
+        switch type {
+        case .keyDown:
+            guard !isPressed,
+                  choice.matches(event.flags)
+            else { return }
             isPressed = true
             onEvent?(.pressed)
+        case .keyUp:
+            guard isPressed else { return }
+            isPressed = false
+            onEvent?(.released)
+        default:
+            return
         }
     }
 

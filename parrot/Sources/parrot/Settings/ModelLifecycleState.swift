@@ -49,6 +49,7 @@ public final class SettingsState {
     public private(set) var loginItemOperationError: String?
     public private(set) var hotkeyChoice: HotkeyChoice
     public private(set) var hotkeyChangeAllowed = true
+    public private(set) var shortcutRecordingActive = false
     public private(set) var modelChangeAllowed = true
     public private(set) var shortcutError: String?
 
@@ -114,6 +115,12 @@ public final class SettingsState {
     public func setHotkeyChangeAllowed(_ allowed: Bool) {
         guard hotkeyChangeAllowed != allowed else { return }
         hotkeyChangeAllowed = allowed
+        notifyObservers()
+    }
+
+    public func setShortcutRecordingActive(_ active: Bool) {
+        guard shortcutRecordingActive != active else { return }
+        shortcutRecordingActive = active
         notifyObservers()
     }
 

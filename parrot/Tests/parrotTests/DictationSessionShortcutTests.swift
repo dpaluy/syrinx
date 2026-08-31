@@ -62,7 +62,7 @@ final class DictationSessionShortcutTests: XCTestCase {
         XCTAssertEqual(session.settingsState.hotkeyChoice, .fnOrGlobe)
         XCTAssertEqual(
             session.settingsState.shortcutError,
-            "Could not activate Right Command"
+            "Could not activate \(HotkeyChoice.rightCommand.displayName)"
         )
 
         session.stop()
@@ -88,7 +88,11 @@ final class DictationSessionShortcutTests: XCTestCase {
         XCTAssertTrue(fallback.isRunning)
         XCTAssertEqual(preferences.hotkeyChoice, .rightOption)
         XCTAssertEqual(session.settingsState.hotkeyChoice, .rightOption)
-        XCTAssertTrue(session.settingsState.shortcutError?.contains("Right Command") ?? false)
+        XCTAssertTrue(
+            session.settingsState.shortcutError?.contains(
+                HotkeyChoice.rightCommand.displayName
+            ) ?? false
+        )
 
         session.stop()
         XCTAssertFalse(fallback.isRunning)
@@ -150,7 +154,28 @@ final class DictationSessionShortcutTests: XCTestCase {
 
         XCTAssertTrue(session.setHotkeyChoice(.rightOption))
 
-        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
+        XCTAssertEqual(
+            menuBar.statusTitleForTesting,
+            "ready · hold \(HotkeyChoice.rightOption.displayName) to dictate"
+        )
+    }
+
+    func testCurrentShortcutDoesNotStartDictationWhileRecorderIsActive() async throws {
+        let factory = FakeHotkeyFactory()
+        let session = makeSession(
+            factory: factory,
+            preferences: AppPreferences(defaults: defaults)
+        )
+
+        try await session.prepare()
+        try session.start()
+        session.settingsState.setShortcutRecordingActive(true)
+
+        let monitor = try XCTUnwrap(factory.monitors.first)
+        monitor.emit(.pressed)
+        monitor.emit(.released)
+
+        XCTAssertEqual(session.phase, .idle)
     }
 
     func testFailedShortcutReplacementAndRestorationKeepMonitoringFailureVisible() async throws {
@@ -221,12 +246,18 @@ final class DictationSessionShortcutTests: XCTestCase {
 
         menuBar.setStarted(false)
         menuBar.setStarted(true)
-        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
+        XCTAssertEqual(
+            menuBar.statusTitleForTesting,
+            "ready · hold \(HotkeyChoice.rightOption.displayName) to dictate"
+        )
 
         menuBar.setFailure("shortcut unavailable")
         menuBar.setRecording(true)
         menuBar.setRecording(false)
-        XCTAssertEqual(menuBar.statusTitleForTesting, "ready · hold Right Option to dictate")
+        XCTAssertEqual(
+            menuBar.statusTitleForTesting,
+            "ready · hold \(HotkeyChoice.rightOption.displayName) to dictate"
+        )
     }
 
     private func preferencesForTest() -> AppPreferences {

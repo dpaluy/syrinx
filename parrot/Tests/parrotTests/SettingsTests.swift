@@ -62,6 +62,32 @@ final class SettingsTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: "Syrinx.addTrailingSpace"))
     }
 
+    func testRecordedShortcutPersistsKeyCodeModifiersAndMacNotation() {
+        let shortcut = HotkeyChoice(
+            keyCode: 0,
+            requiredFlags: [.maskShift, .maskCommand],
+            keyLabel: "A"
+        )
+        let preferences = AppPreferences(defaults: defaults)
+
+        preferences.hotkeyChoice = shortcut
+
+        XCTAssertEqual(AppPreferences(defaults: defaults).hotkeyChoice, shortcut)
+        XCTAssertEqual(shortcut.displayName, "⇧⌘A")
+    }
+
+    func testLegacyShortcutPreferenceStillLoads() {
+        defaults.set("rightOption", forKey: AppPreferences.Keys.hotkeyChoice)
+
+        XCTAssertEqual(AppPreferences(defaults: defaults).hotkeyChoice, .rightOption)
+    }
+
+    func testUnmodifiedFunctionKeyUsesStandardMacNotation() {
+        let shortcut = HotkeyChoice(keyCode: 96, requiredFlags: [], keyLabel: "F5")
+
+        XCTAssertEqual(shortcut.displayName, "F5")
+    }
+
     func testTextOutputModesHaveExplicitUserFacingNames() {
         XCTAssertEqual(TextOutputMode.allCases.map(\.displayName), [
             "Direct typing",
@@ -215,12 +241,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertNil(TextOutputPolicy.output(for: "[BLANK_AUDIO]"))
     }
 
-    func testHotkeyChoicesHaveStableNamesAndModifierPolicies() {
-        XCTAssertEqual(HotkeyChoice.allCases.map(\.displayName), [
-            "Fn or Globe",
-            "Right Command",
-            "Right Option",
-        ])
+    func testLegacyHotkeyChoicesKeepTheirPhysicalModifierPolicies() {
         XCTAssertEqual(HotkeyChoice.fnOrGlobe.keyCode, 63)
         XCTAssertEqual(HotkeyChoice.rightCommand.keyCode, 54)
         XCTAssertEqual(HotkeyChoice.rightOption.keyCode, 61)
