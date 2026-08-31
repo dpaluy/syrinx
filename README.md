@@ -9,7 +9,7 @@ transcription.
 
 ## Project status
 
-Current version: **1.1.0**. See the [changelog](CHANGELOG.md) for release notes.
+Current version: **1.1.1**. See the [changelog](CHANGELOG.md) for release notes.
 
 Syrinx is pre-release software. A signed and notarized Mac application is not
 available until the signing, notarization, and clean-machine gates pass. The
@@ -90,16 +90,16 @@ swift test --package-path parrot
 
 ### Build a release version
 
-From the repository root, run this command and replace `1.1.0` with the
+From the repository root, run this command and replace `1.1.1` with the
 version that you want to build:
 
 ```sh
 ./scripts/release/build-app.sh --swift-build --unsigned-dry-run \
-  --skip-source-validation --version 1.1.0 --tag v1.1.0 \
-  --output-dir dist/1.1.0
+  --skip-source-validation --version 1.1.1 --tag v1.1.1 \
+  --output-dir dist/1.1.1
 ```
 
-The command creates `dist/1.1.0/Syrinx-1.1.0.zip`. The archive contains the
+The command creates `dist/1.1.1/Syrinx-1.1.1.zip`. The archive contains the
 release build of `Syrinx.app`, but it is unsigned. For a signed and notarized
 release, follow the [release operations](docs/release-operations.md).
 
