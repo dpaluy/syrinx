@@ -2,7 +2,10 @@
 
 import argparse
 import importlib.util
+import os
 import plistlib
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,10 +13,56 @@ from unittest import mock
 
 
 MODULE_PATH = Path(__file__).with_name("app-release.py")
+BUILD_SCRIPT = MODULE_PATH.parents[2] / "build.sh"
 SPEC = importlib.util.spec_from_file_location("app_release", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
 app_release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(app_release)
+
+
+class BuildWrapperVersionTests(unittest.TestCase):
+    def test_default_version_comes_from_info_plist(self):
+        with tempfile.TemporaryDirectory() as raw:
+            repo = Path(raw)
+            build_script = repo / "build.sh"
+            shutil.copy2(BUILD_SCRIPT, build_script)
+
+            info_plist = repo / app_release.INFO_PLIST_SOURCE
+            info_plist.parent.mkdir(parents=True)
+            info_plist.write_bytes(
+                plistlib.dumps({"CFBundleShortVersionString": "1.1.0"})
+            )
+
+            release_script = repo / "scripts" / "release" / "build-app.sh"
+            release_script.parent.mkdir(parents=True)
+            release_script.write_text(
+                "#!/bin/sh\n"
+                "while [ \"$#\" -gt 0 ]; do\n"
+                "    if [ \"$1\" = \"--version\" ]; then\n"
+                "        printf '%s' \"$2\" > \"$VERSION_CAPTURE\"\n"
+                "        exit 42\n"
+                "    fi\n"
+                "    shift\n"
+                "done\n"
+                "exit 43\n"
+            )
+            release_script.chmod(0o755)
+
+            capture = repo / "version.txt"
+            environment = os.environ.copy()
+            environment.pop("SYRINX_BUILD_VERSION", None)
+            environment["VERSION_CAPTURE"] = str(capture)
+            result = subprocess.run(
+                [str(build_script)],
+                cwd=repo,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 42, result.stderr)
+            self.assertEqual(capture.read_text(), "1.1.0")
 
 
 class AppReleaseSigningTests(unittest.TestCase):

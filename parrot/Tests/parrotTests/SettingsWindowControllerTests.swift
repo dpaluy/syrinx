@@ -37,7 +37,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         let controls = interactiveControls(in: contentView)
 
         XCTAssertGreaterThanOrEqual(contentView.bounds.height, 540)
-        XCTAssertEqual(controls.count, 6)
+        XCTAssertEqual(controls.count, 7)
         for control in controls {
             let frame = control.convert(control.bounds, to: contentView)
             XCTAssertGreaterThan(frame.width, 0, "Expected usable width for \(control)")
@@ -223,6 +223,29 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertTrue(window.firstResponder === textView)
         XCTAssertEqual(textView.string, draft)
         XCTAssertEqual(textView.selectedRange(), selection)
+    }
+
+    func testSaveReplacementsButtonPersistsConfiguredRules() throws {
+        let preferences = AppPreferences(defaults: defaults)
+        let state = SettingsState(model: TestModel.model, preferences: preferences)
+        let controller = SettingsWindowController(
+            state: state,
+            loginItemController: LoginItemController(service: FakeLoginItemService()),
+            onHotkeyChoiceChanged: { _ in true }
+        )
+        let window = try XCTUnwrap(controller.window)
+        let textView = try XCTUnwrap(replacementsTextView(in: window))
+        controller.showSettings()
+        textView.string = "syrinks => Syrinx"
+
+        let saveButton = try XCTUnwrap(
+            buttons(in: try XCTUnwrap(window.contentView)).first { $0.title == "Save" }
+        )
+        saveButton.sendAction(saveButton.action, to: saveButton.target)
+
+        XCTAssertEqual(preferences.literalReplacements, [
+            LiteralReplacement(match: "syrinks", replacement: "Syrinx"),
+        ])
     }
 
     func testUnrelatedStateRefreshDoesNotClobberActiveReplacementEditor() throws {

@@ -115,6 +115,11 @@ public enum TextOutputMode: String, CaseIterable, Codable, Sendable {
     }
 }
 
+struct LiteralReplacementParseResult: Equatable {
+    let replacements: [LiteralReplacement]
+    let skippedLineCount: Int
+}
+
 enum LiteralReplacementSettingsText {
     private static let separator = " => "
 
@@ -124,20 +129,31 @@ enum LiteralReplacementSettingsText {
             .joined(separator: "\n")
     }
 
-    static func decode(_ text: String) -> [LiteralReplacement] {
-        text.components(separatedBy: .newlines).compactMap { line in
-            guard !line.trimmingCharacters(in: .whitespaces).isEmpty,
-                  let separator = line.range(of: Self.separator)
-            else {
-                return nil
+    static func parse(_ text: String) -> LiteralReplacementParseResult {
+        var replacements: [LiteralReplacement] = []
+        var skippedLineCount = 0
+        for line in text.components(separatedBy: .newlines) {
+            guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
+            guard let separator = line.range(of: Self.separator) else {
+                skippedLineCount += 1
+                continue
             }
             let match = String(line[..<separator.lowerBound])
             let replacement = String(line[separator.upperBound...])
             guard !match.isEmpty else {
-                return nil
+                skippedLineCount += 1
+                continue
             }
-            return LiteralReplacement(match: match, replacement: replacement)
+            replacements.append(LiteralReplacement(match: match, replacement: replacement))
         }
+        return LiteralReplacementParseResult(
+            replacements: replacements,
+            skippedLineCount: skippedLineCount
+        )
+    }
+
+    static func decode(_ text: String) -> [LiteralReplacement] {
+        parse(text).replacements
     }
 }
 

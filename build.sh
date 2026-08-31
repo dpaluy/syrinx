@@ -5,12 +5,11 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 if [ -n "${SYRINX_BUILD_VERSION:-}" ]; then
     version=$SYRINX_BUILD_VERSION
 else
-    version_tag=$(git -C "$repo_root" tag --list 'v[0-9]*' --sort=-version:refname | sed -n '1p')
-    if [ -z "$version_tag" ]; then
-        printf 'No version tag found. Set SYRINX_BUILD_VERSION.\n' >&2
+    info_plist="$repo_root/parrot/Resources/SyrinxApp/Info.plist"
+    if ! version=$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$info_plist"); then
+        printf 'Could not read the app version from %s.\n' "$info_plist" >&2
         exit 1
     fi
-    version=${version_tag#v}
 fi
 staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/syrinx-build.XXXXXX")
 
@@ -58,6 +57,7 @@ rm -f "$dmg_path"
 /usr/bin/codesign --verify --deep --strict "$app_path"
 test -x "$app_path/Contents/MacOS/syrinx"
 /usr/bin/hdiutil verify "$dmg_path" >/dev/null
+find "$dist_dir" -maxdepth 1 -type f -name 'Syrinx-*.dmg' ! -name "$dmg_name" -delete
 
 printf 'Built %s\n' "$app_path"
 printf 'Built %s\n' "$dmg_path"

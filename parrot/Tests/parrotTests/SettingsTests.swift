@@ -206,16 +206,17 @@ final class SettingsTests: XCTestCase {
     }
 
     func testEmptyMatchEditorLinesAreRejectedWithoutDisablingValidTransformations() {
-        let replacements = LiteralReplacementSettingsText.decode("hello => hi\n => invalid")
+        let result = LiteralReplacementSettingsText.parse("hello => hi\n => invalid")
 
         XCTAssertEqual(
-            replacements,
+            result.replacements,
             [LiteralReplacement(match: "hello", replacement: "hi")]
         )
+        XCTAssertEqual(result.skippedLineCount, 1)
         XCTAssertEqual(
             TextOutputPolicy.output(
                 for: "hello comma world period",
-                literalReplacements: replacements,
+                literalReplacements: result.replacements,
                 spokenPunctuationEnabled: true
             ),
             "hi, world."

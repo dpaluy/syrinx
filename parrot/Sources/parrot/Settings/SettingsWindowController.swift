@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-public final class SettingsWindowController: NSWindowController, NSTextViewDelegate {
+public final class SettingsWindowController: NSWindowController {
     private let state: SettingsState
     private let loginItemController: LoginItemController
     private let onHotkeyChoiceChanged: (HotkeyChoice) -> Bool
@@ -17,6 +17,8 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
     )
     private let replacementsTextView = NSTextView(frame: .zero)
     private let replacementsScrollView = NSScrollView(frame: .zero)
+    private let replacementsSaveButton = NSButton(title: "Save", target: nil, action: nil)
+    private let replacementsStatusLabel = NSTextField(labelWithString: "")
     private let shortcutButton = ShortcutRecorderButton()
     private let outputModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let launchAtLoginCheckbox = NSButton(
@@ -73,6 +75,12 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
             name: NSWindow.willCloseNotification,
             object: window
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(replacementsTextDidChange(_:)),
+            name: NSText.didChangeNotification,
+            object: replacementsTextView
+        )
 
         configureControls()
         configureLayout()
@@ -127,9 +135,52 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
 
     public func textDidChange(_ notification: Notification) {
         guard notification.object as? NSTextView === replacementsTextView else { return }
-        state.preferences.literalReplacements = LiteralReplacementSettingsText.decode(
-            replacementsTextView.string
-        )
+        commitReplacements(showFeedback: false)
+    }
+
+    @objc private func replacementsTextDidChange(_ notification: Notification) {
+        guard notification.object as? NSTextView === replacementsTextView else { return }
+        commitReplacements(showFeedback: false)
+    }
+
+    @objc private func saveReplacements(_ sender: NSButton) {
+        commitReplacements(showFeedback: true)
+    }
+
+    @discardableResult
+    private func commitReplacements(showFeedback: Bool) -> LiteralReplacementParseResult {
+        let result = LiteralReplacementSettingsText.parse(replacementsTextView.string)
+        state.preferences.literalReplacements = result.replacements
+        if showFeedback || !isEditingReplacements {
+            updateReplacementsStatus(for: result, saved: showFeedback)
+        }
+        return result
+    }
+
+    private func updateReplacementsStatus(
+        for result: LiteralReplacementParseResult,
+        saved: Bool
+    ) {
+        replacementsStatusLabel.stringValue = replacementsStatusMessage(for: result, saved: saved)
+    }
+
+    private func replacementsStatusMessage(
+        for result: LiteralReplacementParseResult,
+        saved: Bool
+    ) -> String {
+        let count = result.replacements.count
+        if count == 0, result.skippedLineCount == 0 {
+            return saved ? "No replacements saved." : ""
+        }
+        if count == 0 {
+            return "No valid replacements. Use spoken form => replacement on each line."
+        }
+        let noun = count == 1 ? "replacement" : "replacements"
+        let verb = saved ? "saved" : "active"
+        if result.skippedLineCount > 0 {
+            return "\(count) \(noun) \(verb). \(result.skippedLineCount) line(s) skipped — check format."
+        }
+        return "\(count) \(noun) \(verb)."
     }
 
     @objc private func outputModeChanged(_ sender: NSPopUpButton) {
@@ -163,6 +214,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
 
     @objc private func settingsWindowWillClose(_ notification: Notification) {
         shortcutButton.cancelRecording()
+        commitReplacements(showFeedback: false)
     }
 
     @objc private func recoverMicrophonePermission(_ sender: NSButton) {
@@ -177,7 +229,13 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         spokenPunctuationCheckbox.target = self
         spokenPunctuationCheckbox.action = #selector(spokenPunctuationChanged(_:))
 
-        replacementsTextView.delegate = self
+        replacementsSaveButton.target = self
+        replacementsSaveButton.action = #selector(saveReplacements(_:))
+        replacementsStatusLabel.textColor = .secondaryLabelColor
+        replacementsStatusLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        replacementsStatusLabel.maximumNumberOfLines = 0
+        replacementsStatusLabel.lineBreakMode = .byWordWrapping
+
         replacementsTextView.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
         replacementsTextView.isRichText = false
         replacementsTextView.isAutomaticQuoteSubstitutionEnabled = false
@@ -253,11 +311,17 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         guard let contentView = window?.contentView else { return }
 
         let replacementsHelp = NSTextField(
-            wrappingLabelWithString: "Add one replacement per line. Use spoken form => replacement."
+            wrappingLabelWithString: "Add one replacement per line. Use spoken form => replacement, then click Save."
         )
         replacementsHelp.textColor = .secondaryLabelColor
         replacementsHelp.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         replacementsHelp.maximumNumberOfLines = 0
+
+        let replacementsActions = NSStackView(views: [replacementsSaveButton, replacementsStatusLabel])
+        replacementsActions.orientation = .horizontal
+        replacementsActions.spacing = 12
+        replacementsActions.alignment = .centerY
+        replacementsStatusLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         let shortcutRow = makeFormRow(label: "Hold shortcut", control: shortcutButton)
         let outputModeRow = makeFormRow(label: "Text output", control: outputModePopup)
@@ -291,7 +355,7 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
             ),
             makeSection(
                 title: "Replacements",
-                views: [replacementsHelp, replacementsScrollView]
+                views: [replacementsHelp, replacementsScrollView, replacementsActions]
             ),
             makeSection(
                 title: "Shortcut and output",
@@ -411,6 +475,10 @@ public final class SettingsWindowController: NSWindowController, NSTextViewDeleg
         spokenPunctuationCheckbox.state = state.preferences.spokenPunctuationEnabled ? .on : .off
         if !isEditingReplacements {
             loadReplacementsText()
+            updateReplacementsStatus(
+                for: LiteralReplacementSettingsText.parse(replacementsTextView.string),
+                saved: false
+            )
         }
         shortcutButton.setShortcut(state.hotkeyChoice)
         if !state.hotkeyChangeAllowed {
