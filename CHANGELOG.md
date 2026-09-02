@@ -9,6 +9,12 @@
 - Recorded the unresolved Parakeet model-card license conflict as a release
   gate. Model bytes are not included.
 
+## 1.1.2 - 2026-09-02
+
+- Fixed audio capture crashes when the input route or buffer format changed
+  mid-session by letting AVAudioEngine negotiate the tap format and refreshing
+  the converter when callback buffers change source format.
+
 ## 1.1.1 - 2026-08-31
 
 - Restored the black bottom-center recording indicator with three animated
