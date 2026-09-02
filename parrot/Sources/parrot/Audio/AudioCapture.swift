@@ -19,7 +19,7 @@ public final class AudioCapture: AudioCapturing {
     public static let targetSampleRate: Double = 16_000
 
     private let engine = AVAudioEngine()
-    private var converter: AVAudioConverter?
+    private var bufferConverter: AudioCaptureConverter?
     private var samples: [Float] = []
     private var isRecording = false
     private let lock = NSLock()
@@ -33,27 +33,16 @@ public final class AudioCapture: AudioCapturing {
         guard !isRecording else { return }
 
         let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-
-        let targetFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: AudioCapture.targetSampleRate,
-            channels: 1,
-            interleaved: false
-        )!
-
-        guard let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else {
-            throw CaptureError.converterCreationFailed
-        }
-        self.converter = converter
+        let bufferConverter = AudioCaptureConverter()
+        self.bufferConverter = bufferConverter
 
         lock.lock()
         samples.removeAll(keepingCapacity: true)
         lock.unlock()
 
-        // Tap with input format; convert inside the callback.
-        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.process(buffer: buffer, converter: converter, targetFormat: targetFormat)
+        // Let the engine negotiate the tap format with the active input route.
+        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
+            self?.process(buffer: buffer, converter: bufferConverter)
         }
 
         engine.prepare()
@@ -73,6 +62,7 @@ public final class AudioCapture: AudioCapturing {
         guard isRecording else { return [] }
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
+        bufferConverter = nil
         isRecording = false
 
         lock.lock()
@@ -84,30 +74,9 @@ public final class AudioCapture: AudioCapturing {
 
     private func process(
         buffer: AVAudioPCMBuffer,
-        converter: AVAudioConverter,
-        targetFormat: AVAudioFormat
+        converter: AudioCaptureConverter
     ) {
-        // Output buffer capacity scales with sample-rate ratio.
-        let ratio = targetFormat.sampleRate / buffer.format.sampleRate
-        let outCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
-
-        guard let outBuffer = AVAudioPCMBuffer(
-            pcmFormat: targetFormat,
-            frameCapacity: outCapacity
-        ) else { return }
-
-        let input = ConversionInput(buffer: buffer)
-        let inputBlock: AVAudioConverterInputBlock = { _, status in
-            input.next(status)
-        }
-
-        var error: NSError?
-        let status = converter.convert(to: outBuffer, error: &error, withInputFrom: inputBlock)
-        guard status != .error, let channelData = outBuffer.floatChannelData else { return }
-
-        let count = Int(outBuffer.frameLength)
-        let ptr = channelData[0]
-        let chunk = Array(UnsafeBufferPointer(start: ptr, count: count))
+        guard let chunk = converter.convert(buffer: buffer) else { return }
 
         lock.lock()
         samples.append(contentsOf: chunk)
@@ -116,6 +85,67 @@ public final class AudioCapture: AudioCapturing {
         if let onLevel {
             onLevel(computeRMS(chunk))
         }
+    }
+}
+
+/// Converts callback buffers to the fixed format required by the transcriber.
+/// The input route can change after the tap is installed, so the converter is
+/// selected from each callback buffer's negotiated format and reused while it
+/// remains stable.
+final class AudioCaptureConverter {
+    let targetFormat: AVAudioFormat
+
+    private var sourceFormat: AVAudioFormat?
+    private var converter: AVAudioConverter?
+
+    init() {
+        targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: AudioCapture.targetSampleRate,
+            channels: 1,
+            interleaved: false
+        )!
+    }
+
+    func convert(buffer: AVAudioPCMBuffer) -> [Float]? {
+        guard buffer.format.sampleRate > 0 else { return nil }
+        if !matchesCurrentSource(buffer.format) {
+            guard let converter = AVAudioConverter(from: buffer.format, to: targetFormat) else {
+                self.converter = nil
+                sourceFormat = nil
+                return nil
+            }
+            self.converter = converter
+            sourceFormat = buffer.format
+        }
+
+        guard let converter else { return nil }
+
+        // Output buffer capacity scales with the sample-rate ratio.
+        let ratio = targetFormat.sampleRate / buffer.format.sampleRate
+        let outCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
+        guard let outBuffer = AVAudioPCMBuffer(
+            pcmFormat: targetFormat,
+            frameCapacity: outCapacity
+        ) else { return nil }
+
+        let input = ConversionInput(buffer: buffer)
+        let inputBlock: AVAudioConverterInputBlock = { _, status in
+            input.next(status)
+        }
+
+        var error: NSError?
+        let status = converter.convert(to: outBuffer, error: &error, withInputFrom: inputBlock)
+        guard status != .error, let channelData = outBuffer.floatChannelData else { return nil }
+
+        let count = Int(outBuffer.frameLength)
+        let ptr = channelData[0]
+        return Array(UnsafeBufferPointer(start: ptr, count: count))
+    }
+
+    private func matchesCurrentSource(_ format: AVAudioFormat) -> Bool {
+        guard let sourceFormat else { return false }
+        return sourceFormat.isEqual(format)
     }
 }
 
